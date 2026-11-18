@@ -9,8 +9,6 @@
 
 ## ⏭️ To Do
 
-- [ ] Step 12 — First three model families
-- [ ] Step 13 — Remaining model families (≥ 5 total)
 - [ ] Step 14 — Cross-validation and model comparison
 - [ ] Step 15 — Model comparison plots
 - [ ] Step 16 — Bayesian hyperparameter optimisation
@@ -52,3 +50,5 @@ _None._
 - [x] Step 09 — Feature cache and versioning (2026-11-18) — `pathsnap/cache.py` caches alignment/candidates/features per trip under a SHA-256 version key derived from the feature spec, candidate/alignment config, UTM override, and package version; mismatched/corrupt entries are rebuilt. `pytest tests/test_cache.py` 5 passed (reuse, feature-list invalidation, numerical identity, corruption recovery).
 - [x] Step 10 — Metrics module (2026-11-18) — `pathsnap/metrics.py` implements observation Top-1, macro F1, precision/recall, sklearn-parity log loss, alignable-only coverage, route continuity, sequence-aligned route precision/recall, and length-weighted RMF plus a `Timer`. Repeated arcs score by position; perfect predictions give 1.0/zero loss; `pytest tests/test_metrics.py` 8 passed.
 - [x] Step 11 — Training dataset assembly (2026-11-18) — `pathsnap/dataset.py` builds binary-labeled candidate rows with per-row route positions, excludes unalignable observations and low-coverage training trips (<90%), keeps student-test trips out of training, provides deterministic trip-grouped folds, and fits scalers on requested training trips only. `pytest tests/test_dataset.py` 8 passed (disjoint folds, excluded counts, repeated-arc occurrence, scaler isolation).
+- [x] Step 12 — First three model families (2026-11-18) — `pathsnap/models.py` registers Logistic Regression, distance-weighted KNN, and ExtraTrees with serialisable configs, positive-class probabilities, top-1-by-observation helper, and metrics rows including train/inference timing. KNN neighbourhood adapts to the training-set size; `pytest tests/test_models.py` 5 passed.
+- [x] Step 13 — Remaining model families (2026-11-18) — added LightGBM (boosting) and a shallow MLP (neural), bringing the registry to five distinct families. Every model trains on a subset, emits probabilities in [0,1], round-trips through joblib, and predicts after reload; `pytest tests/test_models.py` 12 passed.
