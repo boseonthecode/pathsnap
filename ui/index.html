@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PathSnap — Map Matching Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="app__header">
+      <h1 class="app__title">PathSnap</h1>
+      <p class="app__subtitle">Noisy GPS → connected route</p>
+      <div id="health" class="health health--pending">Connecting…</div>
+    </header>
+
+    <main class="app">
+      <aside class="panel">
+        <section class="panel__section">
+          <label class="field__label" for="trip-select">Evaluation trip</label>
+          <div class="field__row">
+            <select id="trip-select" class="field__select"></select>
+            <button id="rerun-button" class="button" type="button">Run</button>
+          </div>
+        </section>
+
+        <section class="panel__section">
+          <label class="field__label" for="method-select">Method</label>
+          <select id="method-select" class="field__select">
+            <option value="hmm">Classifier + HMM</option>
+            <option value="classifier">Classifier only</option>
+            <option value="nearest">Nearest snap</option>
+          </select>
+        </section>
+
+        <section class="panel__section">
+          <label class="field__label" for="noise-slider">
+            GPS noise σ <span id="noise-value" class="field__value">0 m</span>
+          </label>
+          <input
+            id="noise-slider"
+            class="field__range"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value="0"
+          />
+
+          <label class="field__label" for="sample-slider">
+            Sampling interval <span id="sample-value" class="field__value">1 s</span>
+          </label>
+          <input
+            id="sample-slider"
+            class="field__range"
+            type="range"
+            min="1"
+            max="60"
+            step="1"
+            value="1"
+          />
+        </section>
+
+        <section class="panel__section">
+          <h2 class="panel__heading">Metrics</h2>
+          <div id="metrics" class="metrics">
+            <p class="metrics__empty">Select a trip to see server-side scores.</p>
+          </div>
+        </section>
+
+        <section class="panel__section">
+          <h2 class="panel__heading">Layers</h2>
+          <ul class="legend">
+            <li class="legend__item">
+              <span class="legend__swatch legend__swatch--gps"></span>GPS observations
+            </li>
+            <li class="legend__item">
+              <span class="legend__swatch legend__swatch--candidate"></span>Candidates
+            </li>
+            <li class="legend__item">
+              <span class="legend__swatch legend__swatch--route"></span>Predicted route
+            </li>
+          </ul>
+        </section>
+
+        <p id="status" class="status" role="status"></p>
+      </aside>
+
+      <div id="map" class="map" role="application" aria-label="Trip map"></div>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -9,12 +9,6 @@
 
 ## ⏭️ To Do
 
-- [ ] Step 25 — Static Leaflet UI shell
-- [ ] Step 26 — Interactive noise and sampling controls
-- [ ] Step 27 — Two-laptop deployment and CORS verification
-- [ ] Step 28 — Folium map generation
-- [ ] Step 29 — End-to-end verification across all ten test trips
-- [ ] Step 30 — README and deployment instructions
 - [ ] Step 31 — Technical report
 - [ ] Step 32 — Leakage, security, and repository QA
 
@@ -54,3 +48,9 @@ _None._
 - [x] Step 22 — Artifact loading service (2026-11-18) — `pathsnap/pipeline.py` implements deterministic noise/downsampling, candidate → feature → decode → server-side scoring without exposing labels. `api/service.py` loads the artifact once, validates the feature contract, loads the tuned HMM config, and holds evaluation trips in-memory; real startup loaded 10 trips in 0.5 s and a HMM prediction completed in 3.5 s.
 - [x] Step 23 — FastAPI core endpoints (2026-11-18) — `/health`, `/trips`, `/trips/{trip_id}/observations`, and `/predict` return typed schemas with route geometry, per-point predictions, and aggregate metrics; unknown trips return 404. `pytest tests/test_api.py` passed.
 - [x] Step 24 — API safeguards, configuration, and logging (2026-11-18) — Pydantic bounds reject invalid methods/parameters (422), trip IDs resolve through a discovered-trip allowlist, CORS is env-configurable, request logs carry request ID/trip/method/status/latency/aggregate metrics only, and tests assert no reference/ground-truth keys or log content.
+- [x] Step 25 — Static Leaflet UI shell (2026-11-18) — `ui/index.html`, `style.css`, `app.js`, `config.js` provide the trip picker, API health badge, Leaflet map, layer legend, and metrics panel with no build step.
+- [x] Step 26 — Interactive noise and sampling controls (2026-11-18) — sliders for noise σ and sampling interval, a method selector, debounced re-queries, a request-sequence stale-response guard, and live layer/metric refresh; no reference geometry is requested or rendered.
+- [x] Step 27 — Two-laptop deployment and CORS verification (2026-11-18) — `docs/deployment.md` documents single-machine and LAN setups, env variables, CORS, evaluator-directory mounting, verification commands, and security notes; CORS/env tests pass.
+- [x] Step 28 — Folium map generation (2026-11-18) — `pathsnap/folium_maps.py` + `scripts/07_folium.py` generate three development maps (best HMM gain, regression case, first trip) with GPS, network, reference (dev only), and predicted layers plus a legend; static preview PNGs are saved for the report. `pytest tests/test_folium.py` 2 passed.
+- [x] Step 29 — End-to-end verification across all ten test trips (2026-11-18) — `api/e2e.py` + `scripts/06_e2e.py` call `/health`, `/trips`, `/observations`, and `/predict` for every student-test trip. All 10 returned HTTP 200 with finite metrics; `results/e2e_summary.csv` has 10 complete rows; max full-pipeline inference 6.50 s. `pytest tests/test_e2e.py` 2 passed.
+- [x] Step 30 — README and deployment instructions (2026-11-18) — rewrote `README.md` with installation, data layout, every pipeline command, API/UI run instructions, endpoints, verification, results tables, artifact regeneration, evaluation-integrity rules, and troubleshooting; added the missing `scripts/02_features.py` cache builder.
