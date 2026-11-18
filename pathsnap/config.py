@@ -18,6 +18,7 @@ PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 TRAIN_DATA_DIR: Path = PROJECT_ROOT / "data" / "train"
 TEST_DATA_DIR: Path = PROJECT_ROOT / "data" / "test"
+CACHE_DIR: Path = PROJECT_ROOT / ".cache" / "pathsnap"
 
 # ---------------------------------------------------------------------------
 # Randomness — every stochastic component draws from these seeds
@@ -84,6 +85,7 @@ class Paths:
     eval_data_dir: Path
     artifact_dir: Path
     results_dir: Path
+    cache_dir: Path
 
     def validate_data(self) -> None:
         """Raise a clear error if a required dataset partition is missing."""
@@ -115,10 +117,11 @@ def get_paths() -> Paths:
         eval_data_dir=_env_path("EVAL_DATA_DIR", TEST_DATA_DIR),
         artifact_dir=_env_path("ARTIFACT_DIR", PROJECT_ROOT / "artifacts"),
         results_dir=_env_path("RESULTS_DIR", PROJECT_ROOT / "results"),
+        cache_dir=_env_path("CACHE_DIR", CACHE_DIR),
     )
 
 
 def ensure_output_directories(paths: Paths) -> None:
     """Create generated-output directories (never the read-only data partitions)."""
-    for path in (paths.artifact_dir, paths.results_dir):
+    for path in (paths.artifact_dir, paths.results_dir, paths.cache_dir):
         path.mkdir(parents=True, exist_ok=True)

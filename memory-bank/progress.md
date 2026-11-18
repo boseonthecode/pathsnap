@@ -9,9 +9,6 @@
 
 ## ⏭️ To Do
 
-- [ ] Step 09 — Feature cache and versioning
-- [ ] Step 10 — Metrics module
-- [ ] Step 11 — Training dataset assembly
 - [ ] Step 12 — First three model families
 - [ ] Step 13 — Remaining model families (≥ 5 total)
 - [ ] Step 14 — Cross-validation and model comparison
@@ -52,3 +49,6 @@ _None._
 - [x] Step 06 — Reference label alignment (2026-11-18) — `pathsnap/labels.py` implements monotonic DP alignment over route positions (`_monotonic_align`), emits labels only for observations within 50 m, returns coverage/backward-step/low-coverage diagnostics, and preserves repeated arcs by route position. All ten student-test trips align at ≥99% and `00000033`/`00000054` are flagged low-coverage; `pytest tests/test_labels.py` 5 passed.
 - [x] Step 07 — Candidate generation with spatial index (2026-11-18) — `pathsnap/candidates.py` builds an STRtree over projected arcs, returns top-k candidates with distance/projection/along-fraction/heading metadata, falls back 50→100→200 m, and reports miss rate over alignable observations only. Student-test miss rate ≤1% with every alignable observation covered; `pytest tests/test_candidates.py` 7 passed.
 - [x] Step 08 — Feature extraction (2026-11-18) — `pathsnap/features.py` defines the stable 10-feature order and extracts distance, log-distance, heading difference, speed consistency, rank, along-fraction, arc length, time gap, and node-degree context; empty candidate sets yield a typed empty matrix. Output is finite and bit-identical across runs; `pytest tests/test_features.py` 5 passed.
+- [x] Step 09 — Feature cache and versioning (2026-11-18) — `pathsnap/cache.py` caches alignment/candidates/features per trip under a SHA-256 version key derived from the feature spec, candidate/alignment config, UTM override, and package version; mismatched/corrupt entries are rebuilt. `pytest tests/test_cache.py` 5 passed (reuse, feature-list invalidation, numerical identity, corruption recovery).
+- [x] Step 10 — Metrics module (2026-11-18) — `pathsnap/metrics.py` implements observation Top-1, macro F1, precision/recall, sklearn-parity log loss, alignable-only coverage, route continuity, sequence-aligned route precision/recall, and length-weighted RMF plus a `Timer`. Repeated arcs score by position; perfect predictions give 1.0/zero loss; `pytest tests/test_metrics.py` 8 passed.
+- [x] Step 11 — Training dataset assembly (2026-11-18) — `pathsnap/dataset.py` builds binary-labeled candidate rows with per-row route positions, excludes unalignable observations and low-coverage training trips (<90%), keeps student-test trips out of training, provides deterministic trip-grouped folds, and fits scalers on requested training trips only. `pytest tests/test_dataset.py` 8 passed (disjoint folds, excluded counts, repeated-arc occurrence, scaler isolation).
