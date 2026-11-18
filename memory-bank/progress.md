@@ -9,9 +9,6 @@
 
 ## ⏭️ To Do
 
-- [ ] Step 03 — Trip loader and validator
-- [ ] Step 04 — Dataset inventory / EDA script
-- [ ] Step 05 — Geometry and projection utilities
 - [ ] Step 06 — Reference label alignment
 - [ ] Step 07 — Candidate generation with spatial index
 - [ ] Step 08 — Feature extraction
@@ -52,3 +49,6 @@ _None._
 
 - [x] Step 01 — Repository scaffolding (2026-11-18) — folder skeleton, `requirements.txt`, `.gitignore`, placeholder README, package import smoke test; `pytest tests/test_package.py` passed and all dependencies installed.
 - [x] Step 02 — Configuration module (2026-11-18) — `pathsnap/config.py` with seeds, candidate/alignment/HMM defaults, UTM override, and `TRAIN_DATA_DIR`/`TEST_DATA_DIR`/`EVAL_DATA_DIR`/`ARTIFACT_DIR`/`RESULTS_DIR` env overrides; missing data dirs raise `FileNotFoundError`; `pytest tests/test_config.py` 5 passed.
+- [x] Step 03 — Trip loader and validator (2026-11-18) — `pathsnap/io.py` loads the four raw files with shape/dtype/finite/monotonic/bounds validation; route discontinuities and repeated arcs are diagnostics not fatal; all 80 train + 10 test trips load, corrupt fixtures are rejected, and the audit counts (11 discontinuities, 10 repeated) reproduce; `pytest tests/test_io.py` 10 passed.
+- [x] Step 04 — Dataset inventory / EDA script (2026-11-18) — `scripts/01_eda.py` + `pathsnap/eda.py` write `results/eda_summary.csv` (90 rows, 25 columns, no nulls), `results/eda_report.md`, and `results/folium/eda_00000001.html` with GPS/network/reference layers. Report flags 11 discontinued routes, 10 repeated-arc routes, and severe mismatch trips `00000033`/`00000054`; `pytest tests/test_eda.py` 5 passed.
+- [x] Step 05 — Geometry and projection utilities (2026-11-18) — `pathsnap/geometry.py` adds per-trip UTM `Projection` (round-trip <1 cm), bearings, geodesic and projected distances, point-to-segment projection, arc lengths, directed graph, and `build_route_polyline` with explicit breaks or directed shortest-path bridging. EDA now reuses these utilities. `pytest tests/test_geometry.py` 13 passed.
