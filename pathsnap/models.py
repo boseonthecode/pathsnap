@@ -8,7 +8,7 @@ model comparison artifacts.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import numpy as np
 from sklearn.base import BaseEstimator
@@ -253,8 +253,9 @@ def fit_model(
     labels: np.ndarray,
     seed: int = config.DEFAULT_SEED,
     params: dict[str, Any] | None = None,
+    feature_names: Sequence[str] | None = None,
 ) -> TrainedModel:
-    """Fit a registered model family, optionally overriding estimator parameters."""
+    """Fit a registered model family, optionally overriding parameters or feature subset."""
     if name not in MODEL_SPECS:
         raise KeyError(f"Unknown model {name!r}; available: {sorted(MODEL_SPECS)}")
     spec = MODEL_SPECS[name]
@@ -285,6 +286,7 @@ def fit_model(
     return TrainedModel(
         spec=effective_spec,
         estimator=estimator,
+        feature_names=tuple(feature_names) if feature_names is not None else FEATURE_NAMES,
         train_time_s=timer.elapsed_ms / 1000.0,
     )
 

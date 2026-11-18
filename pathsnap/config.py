@@ -53,6 +53,8 @@ HMM_BETA_M: float = 10.0
 HMM_INVALID_PENALTY: float = 50.0
 HMM_GAP_SPLIT_S: float = 30.0
 HMM_EMISSION: str = "classifier"
+HMM_GAUSSIAN_SIGMA_M: float = 20.0
+HMM_MAX_PATH_M: float = 2000.0
 
 # ---------------------------------------------------------------------------
 # UTM selection

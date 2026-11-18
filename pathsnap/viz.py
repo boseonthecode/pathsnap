@@ -46,6 +46,99 @@ def plot_cv_macro_f1(comparison: pd.DataFrame, out_path: Path) -> Path:
     return out_path
 
 
+DECODER_FIGURE_NAMES: tuple[str, ...] = (
+    "decoder_accuracy_continuity.png",
+    "decoder_by_trip.png",
+)
+
+
+def plot_decoder_comparison(frame: pd.DataFrame, out_path: Path) -> Path:
+    """Mean point accuracy and route continuity for the three matching methods."""
+    order = ["nearest", "classifier", "hmm"]
+    summary = (
+        frame.groupby("method")[["point_accuracy", "route_continuity"]]
+        .mean()
+        .reindex(order)
+    )
+    indices = np.arange(len(order))
+    width = 0.38
+
+    fig, axis = plt.subplots(figsize=(8, 4.5))
+    axis.bar(
+        indices - width / 2,
+        summary["point_accuracy"],
+        width,
+        label="Point accuracy",
+        color="#1f77b4",
+    )
+    axis.bar(
+        indices + width / 2,
+        summary["route_continuity"],
+        width,
+        label="Route continuity",
+        color="#2ca02c",
+    )
+    axis.set_xticks(indices)
+    axis.set_xticklabels(order)
+    axis.set_title("Decoder comparison across student-test trips")
+    axis.set_xlabel("Method")
+    axis.set_ylabel("Mean score")
+    axis.set_ylim(0, 1.0)
+    axis.legend()
+    axis.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
+def plot_decoder_by_trip(frame: pd.DataFrame, out_path: Path) -> Path:
+    """Per-trip point accuracy for nearest, classifier-only, and HMM."""
+    methods = ["nearest", "classifier", "hmm"]
+    trips = sorted(frame["trip_id"].unique())
+    positions = np.arange(len(trips))
+    width = 0.26
+    colors = {"nearest": "#7f7f7f", "classifier": "#ff7f0e", "hmm": "#1f77b4"}
+
+    fig, axis = plt.subplots(figsize=(13, 5))
+    for offset, method in enumerate(methods):
+        subset = frame[frame["method"] == method].set_index("trip_id")
+        values = [float(subset.loc[trip, "point_accuracy"]) for trip in trips]
+        axis.bar(
+            positions + (offset - 1) * width,
+            values,
+            width,
+            label=method,
+            color=colors[method],
+        )
+    axis.set_xticks(positions)
+    axis.set_xticklabels(trips, rotation=45, ha="right", fontsize=8)
+    axis.set_title("Per-trip point accuracy by decoder")
+    axis.set_xlabel("Trip ID")
+    axis.set_ylabel("Point accuracy")
+    axis.set_ylim(0, 1.0)
+    axis.legend()
+    axis.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
+def generate_decoder_plots(
+    comparison: pd.DataFrame, figures_dir: Path
+) -> dict[str, Path]:
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    return {
+        "decoder_accuracy_continuity.png": plot_decoder_comparison(
+            comparison, figures_dir / "decoder_accuracy_continuity.png"
+        ),
+        "decoder_by_trip.png": plot_decoder_by_trip(
+            comparison, figures_dir / "decoder_by_trip.png"
+        ),
+    }
+
+
 def plot_student_test_top1_macro_f1(comparison: pd.DataFrame, out_path: Path) -> Path:
     frame = _student_test(comparison)
     indices = np.arange(frame.shape[0])
@@ -172,3 +265,44 @@ def generate_all_plots(
         ),
     }
     return paths
+
+
+def plot_feature_ablation(ablation: pd.DataFrame, out_path: Path) -> Path:
+    """Leave-one-feature-out importance and cumulative-group progression."""
+    leave_one_out = ablation[ablation["config"].str.startswith("drop_")].copy()
+    leave_one_out["removed_feature"] = leave_one_out["config"].str.removeprefix("drop_")
+    leave_one_out = leave_one_out.sort_values("delta_macro_f1_vs_full")
+
+    cumulative = ablation[ablation["config"].str.startswith("cumulative_")].copy()
+    cumulative["group"] = cumulative["config"].str.removeprefix(
+        "cumulative_through_"
+    )
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(13, 5))
+    left.barh(
+        leave_one_out["removed_feature"],
+        leave_one_out["delta_macro_f1_vs_full"],
+        color="#d62728",
+    )
+    left.set_title("Leave-one-feature-out importance")
+    left.set_xlabel("CV Macro F1 drop vs full feature set")
+    left.set_ylabel("Removed feature")
+    left.grid(axis="x", alpha=0.3)
+
+    right.plot(
+        cumulative["group"],
+        cumulative["cv_macro_f1"],
+        marker="o",
+        color="#1f77b4",
+    )
+    right.set_title("Cumulative feature-group ablation")
+    right.set_xlabel("Feature groups included")
+    right.set_ylabel("CV Macro F1")
+    right.tick_params(axis="x", rotation=25)
+    right.grid(axis="y", alpha=0.3)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+

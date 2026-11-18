@@ -9,8 +9,6 @@
 
 ## ⏭️ To Do
 
-- [ ] Step 18 — HMM emission and transition models
-- [ ] Step 19 — Viterbi decoding and route stitching
 - [ ] Step 20 — Decoder comparison
 - [ ] Step 21 — Decoder visualisation and failure analysis
 - [ ] Step 22 — Artifact loading service
@@ -52,3 +50,7 @@ _None._
 - [x] Step 15 — Model comparison plots (2026-11-18) — `pathsnap/viz.py` generates CV Macro F1, student-test Top-1/Macro F1, log loss, confusion matrices, and timing figures from the stored CSVs into `results/figures/`. `pytest tests/test_viz.py` passed.
 - [x] Step 16 — Bayesian hyperparameter optimisation (2026-11-18) — `pathsnap/tune.py` + `scripts/04_tune.py` run TPE with a trip-grouped CV Macro F1 objective and a size-bounded ExtraTrees space. 15/15 trials completed; `results/optuna_trials.csv` and `results/best_params.json` record params/objective; best CV Macro F1 0.8671. `pytest tests/test_tune.py` 3 passed.
 - [x] Step 17 — Tuned vs. untuned comparison and export (2026-11-18) — `results/tuned_vs_untuned.csv` compares both variants on identical folds and student-test data: tuned 0.8671 vs untuned 0.8858 CV Macro F1, but tuned inference 69 ms vs 150 ms. Exported a 15 MB compressed `artifacts/model.joblib` plus `config.json` (feature order, params, thresholds, versions) and `hmm.json`. Fresh-process prediction parity verified; `pytest tests/test_artifacts.py` 5 passed.
+- [x] Step 18 — HMM emission and transition models (2026-11-18) — `pathsnap/hmm.py` implements classifier and Gaussian emissions normalised in log space, directed network-distance transitions with same-arc fast paths, a cached `NetworkDistance`, and an explicit invalid-transition penalty. Toy tests confirm connected > disconnected, one-way violations are invalid, and emissions normalise; `pytest tests/test_hmm.py -m "not slow"` 5 passed.
+- [x] Step 19 — Viterbi decoding and route stitching (2026-11-18) — added log-space `viterbi_log`, segment splitting on missing candidates/time gaps, `decode_hmm`/`decode_nearest`/`decode_classifier`, and `stitch_arc_sequence` using directed shortest paths. Toy graphs match hand-computed optima; a real test trip decodes a contiguous route (continuity ≥0.9) covering ≥95% of observations; total HMM tests 6 passed.
+- [x] Extra — Static EDA plots (2026-11-18) — `pathsnap/eda_viz.py` + `scripts/01_eda_plots.py` generate six PNGs from `results/eda_summary.csv`: inventory/network size, sampling/gaps, route coverage with anomaly annotations, route anomalies, route/track ratio, and trip extents.
+- [x] Extra — Feature selection and ablation (2026-11-18) — `pathsnap/ablation.py` + `scripts/08_feature_ablation.py` run full, leave-one-feature-out, and cumulative-group CV on training folds only. `results/feature_ablation.csv`, `results/feature_selection.md`, `results/selected_features.json`, and `results/figures/feature_ablation.png` record the 6-feature subset (CV Macro F1 0.8666 vs 0.8671 full).

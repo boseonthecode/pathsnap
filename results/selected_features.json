@@ -1,0 +1,22 @@
+{
+  "full_cv_macro_f1": 0.8670682515389512,
+  "model": "extra_trees",
+  "params": {
+    "class_weight": "balanced_subsample",
+    "criterion": "gini",
+    "max_depth": 12,
+    "max_features": 0.5,
+    "min_samples_leaf": 10,
+    "n_estimators": 200
+  },
+  "selected_cv_macro_f1": 0.8666064229522709,
+  "selected_features": [
+    "distance_m",
+    "heading_diff_deg",
+    "candidate_rank",
+    "along_fraction",
+    "from_degree",
+    "to_degree"
+  ],
+  "tolerance": 0.002
+}
