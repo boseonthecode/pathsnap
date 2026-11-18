@@ -154,6 +154,35 @@ def point_to_segment_distances(
     return out
 
 
+def point_to_segment_distance_matrix(
+    points_xy: np.ndarray,
+    seg_start: np.ndarray,
+    seg_end: np.ndarray,
+    chunk_size: int = 1024,
+) -> np.ndarray:
+    """Full ``(n_points, n_segments)`` projected distance matrix."""
+    n_points = points_xy.shape[0]
+    n_segments = seg_start.shape[0]
+    out = np.empty((n_points, n_segments), dtype=np.float64)
+    if n_points == 0 or n_segments == 0:
+        return out
+
+    ab = seg_end - seg_start
+    ab_sq = np.sum(ab * ab, axis=1)
+    ab_sq = np.where(ab_sq == 0.0, 1.0, ab_sq)
+
+    for start in range(0, n_points, chunk_size):
+        stop = min(start + chunk_size, n_points)
+        pts = points_xy[start:stop]
+        ap = pts[:, None, :] - seg_start[None, :, :]
+        t = np.clip(np.sum(ap * ab[None, :, :], axis=2) / ab_sq[None, :], 0.0, 1.0)
+        closest = seg_start[None, :, :] + t[:, :, None] * ab[None, :, :]
+        delta = pts[:, None, :] - closest
+        out[start:stop] = np.sqrt(np.sum(delta * delta, axis=2))
+
+    return out
+
+
 def polyline_length_m(points_xy: np.ndarray) -> float:
     if points_xy.shape[0] < 2:
         return 0.0
