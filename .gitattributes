@@ -1,0 +1,3 @@
+# Preserve supplied dataset bytes exactly across Windows/Linux checkouts.
+/data/** -text
+/docs/student_materials/*.pdf binary

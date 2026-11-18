@@ -39,12 +39,16 @@ memory-bank/  PRD, architecture, implementation plan, progress
 
 ## Data layout
 
-The provided data is **not committed**. Each partition directory contains one
-folder per trip:
+The three supplied extracted folders are included at the owner's request.
+Training, student-test, and evaluator trips are under `data/train`, `data/test`,
+and `data/evaluator_test`. Supporting PDFs are under `docs/student_materials`.
+`docs/provided_files_manifest.json` records all 405 source files and SHA-256 hashes.
+Each partition directory contains one folder per trip:
 
 ```
 data/train/<trip_id>/<trip_id>.track|.nodes|.arcs|.route
 data/test/<trip_id>/...
+data/evaluator_test/<trip_id>/...
 ```
 
 The API reads evaluation trips from `EVAL_DATA_DIR` (default `data/test`).
@@ -76,6 +80,48 @@ five models. `scripts/04_tune.py` performs 15 Optuna trials and exports the
 final artifacts. All randomness uses seeds in `pathsnap/config.py`.
 
 ## API + UI
+
+### Live command-line demonstration (PowerShell)
+
+These commands load the saved model and run inference live; no API server or
+retraining is needed. Run from the repository root:
+
+```powershell
+# List the ten evaluator trips
+.\.venv\Scripts\python scripts\13_predict_cli.py --list
+
+# Predict a single trip and print classifier, decoder, and route scores
+.\.venv\Scripts\python scripts\13_predict_cli.py --trip-id 00000023
+
+# Run all ten evaluator trips and show aggregate accuracy
+.\.venv\Scripts\python scripts\13_predict_cli.py --all
+
+# Demonstrate the effect of GPS noise and sparse observations
+.\.venv\Scripts\python scripts\13_predict_cli.py --trip-id 00000023 --noise 10 --sample-seconds 5
+
+# Compare with the classifier before HMM decoding
+.\.venv\Scripts\python scripts\13_predict_cli.py --trip-id 00000023 --method classifier
+```
+
+Predicted `.route` files and JSON metrics are written to `results/live_demo/`.
+Use `--sample-seconds 0` to preserve every input observation. The program prints
+the actual score for each selected trip; individual trips can score below the
+overall evaluator average.
+
+### Local evaluator dashboard (Windows)
+
+Run `./start_ui.ps1` from PowerShell, then open
+`http://127.0.0.1:8000/ui/`. The launcher uses `data/evaluator_test` and serves
+the UI and API together. The map has route/GPS/candidate switches, start/end
+markers, and a fit-journey control. Map tiles are OpenStreetMap.
+
+The **Model results** tab separates five-fold classifier CV, student-test,
+and evaluator-test metrics, including classifier/decoder Macro F1, Top-1,
+log loss, and route F1. Regenerate the current model's report with
+`python scripts/12_metrics_dashboard.py`; see
+[`results/model_metrics/REPORT.md`](results/model_metrics/REPORT.md).
+
+The separate-server setup below remains available for a two-laptop demo.
 
 Terminal 1 — API:
 
@@ -137,18 +183,35 @@ Figures live in `results/figures/`; interactive maps live in `results/folium/`.
 
 ## Artifacts
 
-`artifacts/model.joblib` is a compressed ExtraTrees classifier trained on the
-deterministic 300-observations-per-trip sample. `artifacts/config.json` records
+`artifacts/model.joblib` is a compressed ExtraTrees classifier trained on up to
+1,000 aligned observations per training trip. `artifacts/config.json` records
 the feature order, model parameters, candidate/alignment settings, HMM settings,
 versions, and git commit. `artifacts/hmm.json` records the tuned decoder
-parameters (β = 50).
+parameters (beta = 2 m, backward projection tolerance = 60 m, inferred-route
+point refinement enabled).
 
-To regenerate:
+To regenerate the original training pipeline (overwrites optimized artifacts):
 
 ```bash
 python scripts/04_tune.py
 python scripts/05_hmm.py
 ```
+
+### Optimized decoder and evaluator results
+
+The frozen optimized model achieved **96.84% mean-trip point accuracy** and
+**96.72% pooled point accuracy** on all ten trips from `evaluator_test.zip`.
+Mean route sequence F1 is **85.94%**. These metrics are different from the
+classifier-only candidate Macro F1, which is **87.88%**.
+
+Decoder selection used a 64/16 split of the 80 training trips. Evaluator data
+was scored only after model/settings selection. See
+[`results/evaluator_test/REPORT.md`](results/evaluator_test/REPORT.md) for the
+full comparison, per-trip results, limitations, and reproduction commands.
+The original artifacts are preserved locally in `.cache/baseline_artifacts/`.
+
+To serve the evaluator archive after extracting it under `data/evaluator_test`,
+set `EVAL_DATA_DIR=data/evaluator_test` before starting the API.
 
 ## Evaluation integrity
 

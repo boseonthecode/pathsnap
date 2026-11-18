@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 
 import numpy as np
 import pytest
 
 from pathsnap import config
-from pathsnap.candidates import Candidate, generate_candidates
+from pathsnap.candidates import Candidate, CandidateSet, generate_candidates
 from pathsnap.hmm import (
     HMMConfig,
     NetworkDistance,
@@ -18,6 +19,7 @@ from pathsnap.hmm import (
     stitch_arc_sequence,
     transition_log_probability,
     viterbi_log,
+    _emissions_for,
 )
 from pathsnap.io import iter_trips, load_trip
 from pathsnap.metrics import route_continuity
@@ -103,6 +105,60 @@ def test_emissions_are_normalised() -> None:
 
     classifier = classifier_log_emissions(np.array([0.9, 0.1]))
     assert np.exp(classifier).sum() == pytest.approx(1.0)
+
+
+def test_small_backward_jitter_does_not_require_loop(tmp_path: Path) -> None:
+    trip = _toy_trip(tmp_path)
+    network = NetworkDistance(trip)
+    first = _candidate(trip.trip_id, 0, 0, 100.0)
+    second = replace(first, obs_index=1, along_fraction=0.45)
+    assert network.candidate_distance(first, second) is None
+    assert network.candidate_distance(first, second, 10.0) == 0.0
+    assert network.candidate_distance(first, replace(second, along_fraction=0.1), 10.0) is None
+
+
+def test_gap_does_not_invent_connector_route(tmp_path: Path) -> None:
+    trip = load_trip(write_trip(tmp_path / 'train', 'gap'))
+    candidates = CandidateSet(
+        trip.trip_id,
+        (_candidate(trip.trip_id, 0, 0, 100), _candidate(trip.trip_id, 2, 2, 100)),
+        3, 3, 1, 1 / 3,
+    )
+    result = decode_hmm(trip, candidates, config=HMMConfig(emission='gaussian'))
+    assert result.predicted_arcs.tolist() == [0, 2]
+    assert result.point_arc_ids.tolist() == [0, -1, 2]
+    assert result.segment_count == 2
+    assert result.n_unbridged_transitions == 1
+
+
+def test_distance_blend_breaks_equal_classifier_scores() -> None:
+    close = _candidate('example', 0, 0, 100)
+    far = replace(close, arc_id=1, distance_m=40)
+    scores = _emissions_for(
+        [close, far], np.array([0.5, 0.5]), HMMConfig(distance_weight=1)
+    )
+    assert scores[0] > scores[1]
+    assert np.exp(scores).sum() == pytest.approx(1)
+
+
+@pytest.mark.parametrize('params', [
+    {'beta_m': 0}, {'gaussian_sigma_m': 0},
+    {'backward_tolerance_m': -1}, {'distance_weight': -1},
+])
+def test_invalid_decoder_settings_rejected(params) -> None:
+    with pytest.raises(ValueError):
+        HMMConfig(**params)
+
+
+def test_point_refinement_is_independent_of_reference_route(tmp_path: Path) -> None:
+    trip = _toy_trip(tmp_path)
+    candidates = generate_candidates(trip)
+    settings = HMMConfig(emission='gaussian', refine_points=True)
+    first = decode_hmm(trip, candidates, config=settings)
+    changed_reference = replace(trip, route=np.array([2, 2, 2]))
+    second = decode_hmm(changed_reference, candidates, config=settings)
+    np.testing.assert_array_equal(first.point_arc_ids, second.point_arc_ids)
+    np.testing.assert_array_equal(first.predicted_arcs, second.predicted_arcs)
 
 
 def test_viterbi_matches_hand_computed_optimum() -> None:

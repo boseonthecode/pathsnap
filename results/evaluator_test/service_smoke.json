@@ -1,0 +1,21 @@
+{
+  "trip_id": "00000049",
+  "point_accuracy": 1.0,
+  "n_predicted_arcs": 427,
+  "n_points": 2642,
+  "model_loaded": true,
+  "hmm": {
+    "top_k": 8,
+    "radius_m": 50.0,
+    "max_radius_m": 200.0,
+    "beta_m": 2.0,
+    "invalid_penalty": 50.0,
+    "gap_split_s": 30.0,
+    "emission": "classifier",
+    "gaussian_sigma_m": 20.0,
+    "max_path_m": 2000.0,
+    "backward_tolerance_m": 60.0,
+    "distance_weight": 0.0,
+    "refine_points": true
+  }
+}

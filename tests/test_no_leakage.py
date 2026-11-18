@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -23,14 +24,23 @@ def _git(*args: str) -> str:
     )
 
 
-def test_data_directory_is_not_tracked() -> None:
-    tracked = _git("ls-files", "data").strip()
-    assert tracked == ""
+def test_bundled_data_matches_authorized_manifest() -> None:
+    """The owner requested committing all three supplied folders."""
+    manifest = read_json(config.PROJECT_ROOT / "docs/provided_files_manifest.json")
+    assert len(manifest) == 405
+    expected = {row['repository_path'] for row in manifest if row['repository_path'].startswith('data/')}
+    assert set(_git('ls-files', 'data').splitlines()) == expected
+    for row in manifest:
+        path = config.PROJECT_ROOT / row['repository_path']
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == row['sha256']
+    partitions = [{p.name for p in (config.PROJECT_ROOT/'data'/name).iterdir() if p.is_dir()}
+                  for name in ('train', 'test', 'evaluator_test')]
+    assert not (partitions[0] & partitions[1] or partitions[0] & partitions[2] or partitions[1] & partitions[2])
 
 
-def test_gitignore_excludes_data_and_caches() -> None:
+def test_gitignore_excludes_caches_and_credentials() -> None:
     text = (config.PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
-    assert "data/" in text
+    assert "data/" not in text.splitlines()
     assert ".cache/" in text
     assert ".env" in text
 

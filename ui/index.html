@@ -1,105 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PathSnap — Map Matching Demo</title>
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin=""
-    />
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <header class="app__header">
-      <h1 class="app__title">PathSnap</h1>
-      <p class="app__subtitle">Noisy GPS → connected route</p>
-      <div id="health" class="health health--pending">Connecting…</div>
-    </header>
-
-    <main class="app">
-      <aside class="panel">
-        <section class="panel__section">
-          <label class="field__label" for="trip-select">Evaluation trip</label>
-          <div class="field__row">
-            <select id="trip-select" class="field__select"></select>
-            <button id="rerun-button" class="button" type="button">Run</button>
-          </div>
-        </section>
-
-        <section class="panel__section">
-          <label class="field__label" for="method-select">Method</label>
-          <select id="method-select" class="field__select">
-            <option value="hmm">Classifier + HMM</option>
-            <option value="classifier">Classifier only</option>
-            <option value="nearest">Nearest snap</option>
-          </select>
-        </section>
-
-        <section class="panel__section">
-          <label class="field__label" for="noise-slider">
-            GPS noise σ <span id="noise-value" class="field__value">0 m</span>
-          </label>
-          <input
-            id="noise-slider"
-            class="field__range"
-            type="range"
-            min="0"
-            max="100"
-            step="5"
-            value="0"
-          />
-
-          <label class="field__label" for="sample-slider">
-            Sampling interval <span id="sample-value" class="field__value">1 s</span>
-          </label>
-          <input
-            id="sample-slider"
-            class="field__range"
-            type="range"
-            min="1"
-            max="60"
-            step="1"
-            value="1"
-          />
-        </section>
-
-        <section class="panel__section">
-          <h2 class="panel__heading">Metrics</h2>
-          <div id="metrics" class="metrics">
-            <p class="metrics__empty">Select a trip to see server-side scores.</p>
-          </div>
-        </section>
-
-        <section class="panel__section">
-          <h2 class="panel__heading">Layers</h2>
-          <ul class="legend">
-            <li class="legend__item">
-              <span class="legend__swatch legend__swatch--gps"></span>GPS observations
-            </li>
-            <li class="legend__item">
-              <span class="legend__swatch legend__swatch--candidate"></span>Candidates
-            </li>
-            <li class="legend__item">
-              <span class="legend__swatch legend__swatch--route"></span>Predicted route
-            </li>
-          </ul>
-        </section>
-
-        <p id="status" class="status" role="status"></p>
-      </aside>
-
-      <div id="map" class="map" role="application" aria-label="Trip map"></div>
-    </main>
-
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""
-    ></script>
-    <script src="config.js"></script>
-    <script src="app.js"></script>
-  </body>
-</html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PathSnap · Route intelligence</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map" class="map" role="region" aria-label="Interactive road map"></div>
+<aside class="panel">
+  <header class="brand"><div class="brand-icon">↗</div><div><h1>PathSnap<span>LAB</span></h1><p>Find the road behind the noise.</p></div></header>
+  <div class="tabs"><button id="map-tab" class="tab active" type="button">Route explorer</button><button id="results-tab" class="tab" type="button">Model results</button></div>
+  <div class="panel-body">
+  <section class="panel__section">
+    <div class="eyebrow">EVALUATOR DATASET <span id="trip-count"></span></div>
+    <label class="field__label" for="trip-select">Choose a journey</label>
+    <select id="trip-select"><option>Loading trips…</option></select>
+    <div class="field__row"><div class="grow"><label class="field__label" for="method-select">Matching method</label><select id="method-select"><option value="hmm">ExtraTrees + HMM</option><option value="classifier">ExtraTrees only</option><option value="nearest">Nearest road</option></select></div><button id="rerun-button" class="button run" type="button" aria-label="Run prediction">↗</button></div>
+    <div class="model-badge"><span class="model-dot"></span><div><strong>ExtraTreesClassifier</strong><small>200 trees · depth 12 · 10 features</small></div><span class="pill">ACTIVE</span></div>
+  </section>
+  <section class="panel__section experiment">
+    <h2>Test the signal <span class="muted">Live controls</span></h2>
+    <label class="field__label" for="noise-slider">Added GPS noise <span id="noise-value">0 m</span></label><input id="noise-slider" type="range" min="0" max="100" step="5" value="0">
+    <label class="field__label" for="sample-slider">Sampling interval <span id="sample-value">1 s</span></label><input id="sample-slider" type="range" min="1" max="60" step="1" value="1">
+  </section>
+  <section class="panel__section"><h2>Map layers</h2><div class="layer-toggles"><label><input id="layer-route" type="checkbox" checked><span class="legend__swatch route-swatch"></span>Matched route</label><label><input id="layer-gps" type="checkbox" checked><span class="legend__swatch gps-swatch"></span>GPS points</label><label><input id="layer-candidates" type="checkbox"><span class="legend__swatch candidate-swatch"></span>Candidates</label></div></section>
+  <section class="panel__section"><h2>This journey <span class="muted">Live scores</span></h2><div id="metrics" class="metrics"><p class="muted">Run a journey to see its metrics.</p></div></section>
+  </div>
+  <footer><div id="health" class="health">Connecting to model…</div><p id="status" class="status" role="status" aria-live="polite"></p></footer>
+</aside>
+<div class="map-toolbar"><span class="map-chip"><span class="live-dot"></span>Road explorer</span><button id="fit-button" type="button" title="Fit the entire trip">⊕ <span>Fit journey</span></button></div>
+<div id="journey-card" class="journey-card"><div><span class="eyebrow">MATCHED JOURNEY</span><h2 id="journey-title">Your route, reconstructed.</h2><p id="journey-detail">Choose a trip to explore the prediction.</p></div><div class="journey-scores"><div><small>Point accuracy</small><strong id="hero-accuracy">—</strong></div><div><small>Decoder Macro F1</small><strong id="hero-decoder">—</strong></div><div><small>Route F1</small><strong id="hero-route">—</strong></div></div></div>
+<section id="results-panel" class="results-panel" hidden role="dialog" aria-modal="true" aria-label="Model evaluation results">
+<div class="results-heading"><div><span class="eyebrow">EXPERIMENTS & EVALUATION</span><h2>Know what the numbers mean.</h2><p>One model. Separate classifier, decoder, and route measurements.</p></div><button id="close-results" type="button" aria-label="Close model results">×</button></div>
+<div class="results-model"><strong>ExtraTreesClassifier</strong><span>→ HMM / Viterbi → monotonic point refinement</span><p id="model-details">Loading model configuration…</p></div>
+<div id="benchmark-cards" class="benchmark-cards"></div>
+<div class="table-toolbar"><span>Full metric comparison</span><button id="download-metrics" type="button" disabled>↓ Download CSV</button></div>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Metric comparison, scroll horizontally on small screens"><table><thead><tr><th scope="col">Metric</th><th scope="col">5-fold CV</th><th scope="col">Student test</th><th scope="col">Evaluator test</th></tr></thead><tbody id="benchmark-table"><tr><td colspan="4">Loading the saved metric report…</td></tr></tbody></table></div>
+<p id="evaluation-protocol" class="protocol"></p>
+<div class="definitions"><h3>Different scores answer different questions</h3><p><b>Classifier Macro F1</b> measures candidate match/non-match decisions before decoding. <b>Decoder Macro F1</b> measures candidate selection after the route is decoded. <b>Route F1</b> measures the ordered road sequence. These are not interchangeable.</p><p><b>Top-1</b> asks whether the selected road is correct. <b>Log loss</b> measures classifier probability quality; lower is better. CV scores come from held-out trips within training data. Evaluator trips are never used to fit or tune the model.</p><p id="metrics-updated"></p></div>
+</section>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="config.js"></script><script src="app.js"></script>
+</body></html>
