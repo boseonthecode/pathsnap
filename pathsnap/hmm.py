@@ -66,23 +66,22 @@ class NetworkDistance:
         self.trip = trip
         self.max_path_m = max_path_m
         self.graph = build_directed_graph(trip)
-        self._node_cache: dict[tuple[int, int], float | None] = {}
+        # One Dijkstra per source node; targets within the cutoff are cached.
+        self._source_cache: dict[int, dict[int, float]] = {}
 
     def node_distance(self, source: int, target: int) -> float | None:
         if source == target:
             return 0.0
-        key = (source, target)
-        if key in self._node_cache:
-            return self._node_cache[key]
-        try:
-            lengths = nx.single_source_dijkstra_path_length(
-                self.graph, source, cutoff=self.max_path_m, weight="length_m"
-            )
-            distance = lengths.get(target)
-        except nx.NodeNotFound:
-            distance = None
-        self._node_cache[key] = distance
-        return distance
+        distances = self._source_cache.get(source)
+        if distances is None:
+            try:
+                distances = nx.single_source_dijkstra_path_length(
+                    self.graph, source, cutoff=self.max_path_m, weight="length_m"
+                )
+            except nx.NodeNotFound:
+                distances = {}
+            self._source_cache[source] = distances
+        return distances.get(target)
 
     def candidate_distance(self, first: Candidate, second: Candidate) -> float | None:
         """Network distance from the first projection through to the second."""

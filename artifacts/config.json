@@ -22,10 +22,12 @@
     "to_degree"
   ],
   "hmm": {
-    "beta_m": 10.0,
+    "beta_m": 50.0,
     "emission": "classifier",
     "gap_split_s": 30.0,
+    "gaussian_sigma_m": 20.0,
     "invalid_penalty": 50.0,
+    "max_path_m": 2000.0,
     "max_radius_m": 200.0,
     "radius_m": 50.0,
     "top_k": 8

@@ -9,11 +9,6 @@
 
 ## ⏭️ To Do
 
-- [ ] Step 20 — Decoder comparison
-- [ ] Step 21 — Decoder visualisation and failure analysis
-- [ ] Step 22 — Artifact loading service
-- [ ] Step 23 — FastAPI core endpoints
-- [ ] Step 24 — API safeguards, configuration, and logging
 - [ ] Step 25 — Static Leaflet UI shell
 - [ ] Step 26 — Interactive noise and sampling controls
 - [ ] Step 27 — Two-laptop deployment and CORS verification
@@ -54,3 +49,8 @@ _None._
 - [x] Step 19 — Viterbi decoding and route stitching (2026-11-18) — added log-space `viterbi_log`, segment splitting on missing candidates/time gaps, `decode_hmm`/`decode_nearest`/`decode_classifier`, and `stitch_arc_sequence` using directed shortest paths. Toy graphs match hand-computed optima; a real test trip decodes a contiguous route (continuity ≥0.9) covering ≥95% of observations; total HMM tests 6 passed.
 - [x] Extra — Static EDA plots (2026-11-18) — `pathsnap/eda_viz.py` + `scripts/01_eda_plots.py` generate six PNGs from `results/eda_summary.csv`: inventory/network size, sampling/gaps, route coverage with anomaly annotations, route anomalies, route/track ratio, and trip extents.
 - [x] Extra — Feature selection and ablation (2026-11-18) — `pathsnap/ablation.py` + `scripts/08_feature_ablation.py` run full, leave-one-feature-out, and cumulative-group CV on training folds only. `results/feature_ablation.csv`, `results/feature_selection.md`, `results/selected_features.json`, and `results/figures/feature_ablation.png` record the 6-feature subset (CV Macro F1 0.8666 vs 0.8671 full).
+- [x] Step 20 — Decoder comparison (2026-11-18) — `scripts/05_hmm.py` tunes β on train/student-test trips (best β=50) and compares nearest, classifier-only, and classifier+HMM across all 10 student-test trips. `results/hmm_comparison.csv` (30 rows) and `results/decoder_tuning.csv` record point accuracy, continuity, route P/R, RMF, coverage, and timing: HMM 0.8562 accuracy / 0.9994 continuity vs classifier 0.8241 / 0.9974 vs nearest 0.5646 / 0.9977; max HMM decode 5.95 s after source-level shortest-path caching.
+- [x] Step 21 — Decoder visualisation and failure analysis (2026-11-18) — `results/figures/decoder_accuracy_continuity.png` and `decoder_by_trip.png` derive from the stored comparison CSV; `results/hmm_failure_analysis.md` names `00000052` as the strongest HMM gain (+0.0802 accuracy) and `00000065` as the regression case (−0.0065).
+- [x] Step 22 — Artifact loading service (2026-11-18) — `pathsnap/pipeline.py` implements deterministic noise/downsampling, candidate → feature → decode → server-side scoring without exposing labels. `api/service.py` loads the artifact once, validates the feature contract, loads the tuned HMM config, and holds evaluation trips in-memory; real startup loaded 10 trips in 0.5 s and a HMM prediction completed in 3.5 s.
+- [x] Step 23 — FastAPI core endpoints (2026-11-18) — `/health`, `/trips`, `/trips/{trip_id}/observations`, and `/predict` return typed schemas with route geometry, per-point predictions, and aggregate metrics; unknown trips return 404. `pytest tests/test_api.py` passed.
+- [x] Step 24 — API safeguards, configuration, and logging (2026-11-18) — Pydantic bounds reject invalid methods/parameters (422), trip IDs resolve through a discovered-trip allowlist, CORS is env-configurable, request logs carry request ID/trip/method/status/latency/aggregate metrics only, and tests assert no reference/ground-truth keys or log content.

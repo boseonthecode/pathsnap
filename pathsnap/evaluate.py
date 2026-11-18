@@ -3,15 +3,53 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
 
 from pathsnap import config
+from pathsnap.artifacts import ModelArtifact
+from pathsnap.candidates import CandidateSet, generate_candidates
 from pathsnap.dataset import DatasetBundle, TripDataset, trip_grouped_folds
+from pathsnap.features import extract_features
+from pathsnap.geometry import arc_lengths_m
+from pathsnap.hmm import (
+    DecodeResult,
+    HMMConfig,
+    decode_classifier,
+    decode_hmm,
+    decode_nearest,
+)
+from pathsnap.io import Trip
+from pathsnap.labels import AlignmentResult, align_observations
+from pathsnap.metrics import (
+    Timer,
+    observation_top1_accuracy,
+    route_continuity,
+    route_mismatch_fraction,
+    route_precision_recall,
+)
 from pathsnap.models import MODEL_SPECS, ModelResult, evaluate_model, fit_model
+
+DECODER_COLUMNS: tuple[str, ...] = (
+    "trip_id",
+    "partition",
+    "method",
+    "point_accuracy",
+    "route_continuity",
+    "route_precision",
+    "route_recall",
+    "rmf",
+    "alignment_coverage",
+    "inference_ms",
+    "n_points",
+    "n_missing_points",
+    "n_predicted_arcs",
+    "n_unbridged_transitions",
+)
 
 COMPARISON_COLUMNS: tuple[str, ...] = (
     "model",
@@ -241,3 +279,203 @@ def write_selection_note(
         )
     lines.append("")
     out_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Decoder comparison (nearest-snap / classifier-only / classifier + HMM)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TripInference:
+    """Prepared candidates, probabilities, alignment, and arc lengths for one trip."""
+
+    trip: Trip
+    candidates: CandidateSet
+    probabilities: np.ndarray
+    alignment: AlignmentResult
+    arc_lengths: np.ndarray
+
+
+def prepare_trip_inference(trip: Trip, artifact: ModelArtifact) -> TripInference:
+    """Generate all candidates, score them with the artifact, and align labels."""
+    alignment = align_observations(trip)
+    candidates = generate_candidates(trip)
+    features = extract_features(trip, candidates)
+    probabilities = artifact.positive_probability(features.features)
+    return TripInference(
+        trip=trip,
+        candidates=candidates,
+        probabilities=probabilities,
+        alignment=alignment,
+        arc_lengths=arc_lengths_m(trip),
+    )
+
+
+def _decode_row(
+    inference: TripInference, result: DecodeResult, inference_ms: float
+) -> dict[str, Any]:
+    alignment = inference.alignment
+    point_accuracy = observation_top1_accuracy(
+        alignment.arc_ids, result.point_arc_ids, alignment.alignable
+    )
+    precision, recall = route_precision_recall(result.predicted_arcs, inference.trip.route)
+    mismatch = route_mismatch_fraction(
+        result.predicted_arcs, inference.trip.route, inference.arc_lengths
+    )
+    return {
+        "trip_id": inference.trip.trip_id,
+        "partition": inference.trip.partition,
+        "method": result.method,
+        "point_accuracy": point_accuracy,
+        "route_continuity": route_continuity(result.predicted_arcs, inference.trip.arcs),
+        "route_precision": precision,
+        "route_recall": recall,
+        "rmf": mismatch,
+        "alignment_coverage": alignment.coverage,
+        "inference_ms": inference_ms,
+        "n_points": inference.trip.n_points,
+        "n_missing_points": int(np.count_nonzero(result.point_arc_ids < 0)),
+        "n_predicted_arcs": int(result.predicted_arcs.size),
+        "n_unbridged_transitions": result.n_unbridged_transitions,
+    }
+
+
+def evaluate_decoders(
+    inference: TripInference,
+    hmm_config: HMMConfig | None = None,
+) -> pd.DataFrame:
+    """Run nearest-snap, classifier-only, and classifier+HMM on one prepared trip."""
+    hmm_config = hmm_config or HMMConfig()
+
+    with Timer() as nearest_timer:
+        nearest = decode_nearest(inference.trip, inference.candidates)
+    with Timer() as classifier_timer:
+        classifier = decode_classifier(
+            inference.trip, inference.candidates, inference.probabilities
+        )
+    with Timer() as hmm_timer:
+        hmm = decode_hmm(
+            inference.trip,
+            inference.candidates,
+            probabilities=inference.probabilities,
+            config=replace(hmm_config, emission="classifier"),
+        )
+
+    rows = [
+        _decode_row(inference, nearest, nearest_timer.elapsed_ms),
+        _decode_row(inference, classifier, classifier_timer.elapsed_ms),
+        _decode_row(inference, hmm, hmm_timer.elapsed_ms),
+    ]
+    return pd.DataFrame(rows, columns=list(DECODER_COLUMNS))
+
+
+DECODER_TUNING_COLUMNS: tuple[str, ...] = DECODER_COLUMNS + ("beta_m",)
+
+
+def tune_decoder_betas(
+    inferences: Sequence[TripInference],
+    betas: Sequence[float] = (5.0, 10.0, 20.0, 50.0),
+    base_config: HMMConfig | None = None,
+) -> tuple[pd.DataFrame, float]:
+    """Grid-search beta on training/student-test trips only.
+
+    Returns the per-trial table and the beta with the best mean point accuracy
+    (route continuity breaks ties).
+    """
+    base_config = base_config or HMMConfig()
+    rows: list[dict[str, Any]] = []
+
+    for beta in betas:
+        config_for_beta = replace(base_config, beta_m=float(beta), emission="classifier")
+        for inference in inferences:
+            with Timer() as timer:
+                result = decode_hmm(
+                    inference.trip,
+                    inference.candidates,
+                    probabilities=inference.probabilities,
+                    config=config_for_beta,
+                )
+            row = _decode_row(inference, result, timer.elapsed_ms)
+            row["beta_m"] = float(beta)
+            rows.append(row)
+
+    frame = pd.DataFrame(rows, columns=list(DECODER_TUNING_COLUMNS))
+    if frame.empty:
+        return frame, float(base_config.beta_m)
+    summary = (
+        frame.groupby("beta_m")[["point_accuracy", "route_continuity"]]
+        .mean()
+        .sort_values(["point_accuracy", "route_continuity"], ascending=[False, False])
+    )
+    return frame, float(summary.index[0])
+
+
+def write_decoder_failure_analysis(frame: pd.DataFrame, out_path: Path) -> None:
+    """Compare classifier-only vs HMM per trip and document improvement/regression."""
+    accuracy = frame.pivot_table(
+        index="trip_id", columns="method", values="point_accuracy"
+    )
+    continuity = frame.pivot_table(
+        index="trip_id", columns="method", values="route_continuity"
+    )
+    delta_accuracy = accuracy["hmm"] - accuracy["classifier"]
+    delta_continuity = continuity["hmm"] - continuity["classifier"]
+
+    best_trip = str(delta_accuracy.idxmax())
+    worst_trip = str(delta_accuracy.idxmin())
+
+    lines = [
+        "# Decoder failure analysis",
+        "",
+        "Comparison of classifier-only predictions with classifier+HMM decoding. "
+        "Positive deltas mean HMM improved the metric.",
+        "",
+        "| Trip | Classifier accuracy | HMM accuracy | Δ accuracy | "
+        "Classifier continuity | HMM continuity | Δ continuity |",
+        "| :--- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for trip_id in accuracy.index:
+        lines.append(
+            f"| {trip_id} | {accuracy.loc[trip_id, 'classifier']:.4f} | "
+            f"{accuracy.loc[trip_id, 'hmm']:.4f} | {delta_accuracy.loc[trip_id]:+.4f} | "
+            f"{continuity.loc[trip_id, 'classifier']:.4f} | "
+            f"{continuity.loc[trip_id, 'hmm']:.4f} | "
+            f"{delta_continuity.loc[trip_id]:+.4f} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Case study: HMM helps",
+            "",
+            f"Trip `{best_trip}` gained {delta_accuracy.loc[best_trip]:+.4f} point "
+            f"accuracy and {delta_continuity.loc[best_trip]:+.4f} route continuity. "
+            "The transition term suppresses locally plausible but topologically "
+            "isolated candidates, so the decoded sequence follows connected arcs "
+            "instead of independent per-point snap decisions.",
+            "",
+            "## Case study: HMM does not help",
+            "",
+        ]
+    )
+    worst_delta = float(delta_accuracy.loc[worst_trip])
+    if worst_delta < 0:
+        lines.append(
+            f"Trip `{worst_trip}` lost {abs(worst_delta):.4f} point accuracy "
+            f"(continuity delta {delta_continuity.loc[worst_trip]:+.4f}). When the "
+            "GPS noise or a parallel-road ambiguity makes several candidates nearly "
+            "equally likely, the transition penalty can prefer a connected but "
+            "locally wrong arc, overriding the classifier's top choice."
+        )
+    else:
+        lines.append(
+            f"Trip `{worst_trip}` showed the smallest gain "
+            f"({worst_delta:+.4f} point accuracy, continuity delta "
+            f"{delta_continuity.loc[worst_trip]:+.4f}). No student-test trip "
+            "regressed in point accuracy; this trip is the weakest positive case, "
+            "where connectivity constraints had little room to correct errors."
+        )
+    lines.append("")
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+
