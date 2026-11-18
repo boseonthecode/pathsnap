@@ -1,0 +1,9 @@
+{
+  "beta_m": 10.0,
+  "emission": "classifier",
+  "gap_split_s": 30.0,
+  "invalid_penalty": 50.0,
+  "max_radius_m": 200.0,
+  "radius_m": 50.0,
+  "top_k": 8
+}

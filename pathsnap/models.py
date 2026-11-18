@@ -213,6 +213,7 @@ class ModelResult:
     family: str
     config: dict[str, Any]
     n_rows: int
+    n_observations: int
     macro_f1: float
     precision: float
     recall: float
@@ -220,6 +221,10 @@ class ModelResult:
     top1_accuracy: float | None
     train_time_s: float
     inference_ms: float
+    tn: int
+    fp: int
+    fn: int
+    tp: int
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -227,6 +232,7 @@ class ModelResult:
             "family": self.family,
             "config": self.config,
             "n_rows": self.n_rows,
+            "n_observations": self.n_observations,
             "macro_f1": self.macro_f1,
             "precision": self.precision,
             "recall": self.recall,
@@ -234,6 +240,10 @@ class ModelResult:
             "top1_accuracy": self.top1_accuracy,
             "train_time_s": self.train_time_s,
             "inference_ms": self.inference_ms,
+            "tn": self.tn,
+            "fp": self.fp,
+            "fn": self.fn,
+            "tp": self.tp,
         }
 
 
@@ -242,12 +252,15 @@ def fit_model(
     features: np.ndarray,
     labels: np.ndarray,
     seed: int = config.DEFAULT_SEED,
+    params: dict[str, Any] | None = None,
 ) -> TrainedModel:
-    """Fit a registered model family with deterministic settings."""
+    """Fit a registered model family, optionally overriding estimator parameters."""
     if name not in MODEL_SPECS:
         raise KeyError(f"Unknown model {name!r}; available: {sorted(MODEL_SPECS)}")
     spec = MODEL_SPECS[name]
     estimator = spec.factory(seed)
+    if params:
+        estimator.set_params(**params)
 
     # Instance-based models cannot request more neighbours than training rows.
     estimator_params = estimator.get_params()
@@ -259,10 +272,18 @@ def fit_model(
             )
         )
 
+    effective_params = {**spec.params, **(params or {})}
+    effective_spec = ModelSpec(
+        name=spec.name,
+        family=spec.family,
+        params=effective_params,
+        factory=spec.factory,
+    )
+
     with Timer() as timer:
         estimator.fit(features, labels)
     return TrainedModel(
-        spec=spec,
+        spec=effective_spec,
         estimator=estimator,
         train_time_s=timer.elapsed_ms / 1000.0,
     )
@@ -313,11 +334,21 @@ def evaluate_model(
         else None
     )
 
+    labels_int = np.asarray(labels).astype(np.int8)
+    tn = int(np.count_nonzero((labels_int == 0) & (predictions == 0)))
+    fp = int(np.count_nonzero((labels_int == 0) & (predictions == 1)))
+    fn = int(np.count_nonzero((labels_int == 1) & (predictions == 0)))
+    tp = int(np.count_nonzero((labels_int == 1) & (predictions == 1)))
+    n_observations = (
+        int(np.unique(observation_indices).size) if observation_indices is not None else 0
+    )
+
     return ModelResult(
         model=trained.spec.name,
         family=trained.spec.family,
         config=trained.spec.config(),
         n_rows=int(features.shape[0]),
+        n_observations=n_observations,
         macro_f1=candidate_macro_f1(labels, predictions),
         precision=precision,
         recall=recall,
@@ -325,6 +356,10 @@ def evaluate_model(
         top1_accuracy=top1,
         train_time_s=trained.train_time_s,
         inference_ms=timer.elapsed_ms,
+        tn=tn,
+        fp=fp,
+        fn=fn,
+        tp=tp,
     )
 
 

@@ -1,0 +1,64 @@
+{
+  "alignment": {
+    "low_coverage_threshold": 0.9,
+    "max_distance_m": 50.0
+  },
+  "candidate": {
+    "max_radius_m": 200.0,
+    "radius_m": 50.0,
+    "top_k": 8
+  },
+  "family": "ensemble",
+  "feature_names": [
+    "distance_m",
+    "log_distance",
+    "heading_diff_deg",
+    "speed_consistency",
+    "candidate_rank",
+    "along_fraction",
+    "arc_length_m",
+    "time_gap_s",
+    "from_degree",
+    "to_degree"
+  ],
+  "hmm": {
+    "beta_m": 10.0,
+    "emission": "classifier",
+    "gap_split_s": 30.0,
+    "invalid_penalty": 50.0,
+    "max_radius_m": 200.0,
+    "radius_m": 50.0,
+    "top_k": 8
+  },
+  "metadata": {
+    "best_params": {
+      "class_weight": "balanced_subsample",
+      "criterion": "gini",
+      "max_depth": 12,
+      "max_features": 0.5,
+      "min_samples_leaf": 10,
+      "n_estimators": 200
+    },
+    "completed_trials": 15,
+    "cv_macro_f1": 0.8670682515389512,
+    "git_commit": "8fb7ca92350c5370b5f49e8ba88a4518f0f65696",
+    "selection": "optuna",
+    "trained_at": "2026-11-18T06:31:15.036200+00:00",
+    "versions": {
+      "lightgbm": "4.7.0",
+      "numpy": "2.5.1",
+      "pathsnap": "0.1.0",
+      "sklearn": "1.9.0"
+    }
+  },
+  "model_name": "extra_trees",
+  "params": {
+    "class_weight": "balanced_subsample",
+    "criterion": "gini",
+    "max_depth": 12,
+    "max_features": 0.5,
+    "min_samples_leaf": 10,
+    "n_estimators": 200
+  },
+  "seed": 42
+}

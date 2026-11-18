@@ -143,12 +143,15 @@ def assemble_dataset(
     artifacts: Sequence[TripArtifacts] | None = None,
     min_coverage: float = config.LOW_COVERAGE_THRESHOLD,
     use_cache: bool = True,
+    load_candidates: bool = False,
 ) -> DatasetBundle:
     """Build a bundle from trips, loading cached artifacts when possible."""
     trip_list = list(trips)
     if artifacts is None:
         artifacts = [
-            load_or_build_trip_artifacts(trip, use_cache=use_cache)
+            load_or_build_trip_artifacts(
+                trip, use_cache=use_cache, load_candidates=load_candidates
+            )
             for trip in trip_list
         ]
     if len(artifacts) != len(trip_list):

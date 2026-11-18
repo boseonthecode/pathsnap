@@ -129,8 +129,13 @@ def load_trip_artifacts(
     cache_dir: Path,
     version: str,
     feature_names: Sequence[str] = FEATURE_NAMES,
+    load_candidates: bool = True,
 ) -> TripArtifacts | None:
-    """Load a matching cache entry, or return ``None`` if missing/stale/corrupt."""
+    """Load a matching cache entry, or return ``None`` if missing/stale/corrupt.
+
+    Set ``load_candidates=False`` for training assembly to skip rebuilding
+    Python ``Candidate`` objects; labels only need features and alignment.
+    """
     npz_path, manifest_path = _cache_paths(cache_dir, version, trip_id)
     if not npz_path.is_file() or not manifest_path.is_file():
         return None
@@ -149,20 +154,24 @@ def load_trip_artifacts(
         candidate_meta = manifest["candidate_meta"]
         alignment_meta = manifest["alignment_meta"]
 
-        candidates = tuple(
-            Candidate(
-                trip_id=trip_id,
-                obs_index=int(data["candidate_obs"][i]),
-                arc_id=int(data["candidate_arc"][i]),
-                distance_m=float(data["candidate_distance"][i]),
-                proj_lon=float(data["candidate_proj_lon"][i]),
-                proj_lat=float(data["candidate_proj_lat"][i]),
-                along_fraction=float(data["candidate_along"][i]),
-                heading_diff_deg=float(data["candidate_heading_diff"][i]),
-                rank=int(data["candidate_rank"][i]),
-                arc_length_m=float(data["candidate_arc_length"][i]),
+        candidates = (
+            tuple(
+                Candidate(
+                    trip_id=trip_id,
+                    obs_index=int(data["candidate_obs"][i]),
+                    arc_id=int(data["candidate_arc"][i]),
+                    distance_m=float(data["candidate_distance"][i]),
+                    proj_lon=float(data["candidate_proj_lon"][i]),
+                    proj_lat=float(data["candidate_proj_lat"][i]),
+                    along_fraction=float(data["candidate_along"][i]),
+                    heading_diff_deg=float(data["candidate_heading_diff"][i]),
+                    rank=int(data["candidate_rank"][i]),
+                    arc_length_m=float(data["candidate_arc_length"][i]),
+                )
+                for i in range(data["candidate_arc"].shape[0])
             )
-            for i in range(data["candidate_arc"].shape[0])
+            if load_candidates
+            else ()
         )
         candidate_set = CandidateSet(
             trip_id=trip_id,
@@ -206,13 +215,16 @@ def load_or_build_trip_artifacts(
     cache_dir: Path | None = None,
     version: str | None = None,
     use_cache: bool = True,
+    load_candidates: bool = True,
 ) -> TripArtifacts:
     """Return cached artifacts when the version matches, otherwise build and save."""
     cache_dir = config.get_paths().cache_dir if cache_dir is None else cache_dir
     version = compute_cache_version() if version is None else version
 
     if use_cache:
-        cached = load_trip_artifacts(trip.trip_id, cache_dir, version)
+        cached = load_trip_artifacts(
+            trip.trip_id, cache_dir, version, load_candidates=load_candidates
+        )
         if cached is not None:
             return cached
 

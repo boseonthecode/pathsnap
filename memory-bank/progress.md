@@ -9,10 +9,6 @@
 
 ## ⏭️ To Do
 
-- [ ] Step 14 — Cross-validation and model comparison
-- [ ] Step 15 — Model comparison plots
-- [ ] Step 16 — Bayesian hyperparameter optimisation
-- [ ] Step 17 — Tuned vs. untuned comparison and export
 - [ ] Step 18 — HMM emission and transition models
 - [ ] Step 19 — Viterbi decoding and route stitching
 - [ ] Step 20 — Decoder comparison
@@ -52,3 +48,7 @@ _None._
 - [x] Step 11 — Training dataset assembly (2026-11-18) — `pathsnap/dataset.py` builds binary-labeled candidate rows with per-row route positions, excludes unalignable observations and low-coverage training trips (<90%), keeps student-test trips out of training, provides deterministic trip-grouped folds, and fits scalers on requested training trips only. `pytest tests/test_dataset.py` 8 passed (disjoint folds, excluded counts, repeated-arc occurrence, scaler isolation).
 - [x] Step 12 — First three model families (2026-11-18) — `pathsnap/models.py` registers Logistic Regression, distance-weighted KNN, and ExtraTrees with serialisable configs, positive-class probabilities, top-1-by-observation helper, and metrics rows including train/inference timing. KNN neighbourhood adapts to the training-set size; `pytest tests/test_models.py` 5 passed.
 - [x] Step 13 — Remaining model families (2026-11-18) — added LightGBM (boosting) and a shallow MLP (neural), bringing the registry to five distinct families. Every model trains on a subset, emits probabilities in [0,1], round-trips through joblib, and predicts after reload; `pytest tests/test_models.py` 12 passed.
+- [x] Step 14 — Cross-validation and model comparison (2026-11-18) — `pathsnap/evaluate.py` + `scripts/03_train.py` run deterministic trip-grouped CV (300 evenly spaced observations/trip) and student-test evaluation for all five models, writing 30-row `results/model_comparison.csv`, `results/student_test_comparison.csv`, and `results/model_selection.md`. Selected `extra_trees` by CV Macro F1 (0.8858; student-test 0.8878). `pytest tests/test_evaluate.py` 6 passed.
+- [x] Step 15 — Model comparison plots (2026-11-18) — `pathsnap/viz.py` generates CV Macro F1, student-test Top-1/Macro F1, log loss, confusion matrices, and timing figures from the stored CSVs into `results/figures/`. `pytest tests/test_viz.py` passed.
+- [x] Step 16 — Bayesian hyperparameter optimisation (2026-11-18) — `pathsnap/tune.py` + `scripts/04_tune.py` run TPE with a trip-grouped CV Macro F1 objective and a size-bounded ExtraTrees space. 15/15 trials completed; `results/optuna_trials.csv` and `results/best_params.json` record params/objective; best CV Macro F1 0.8671. `pytest tests/test_tune.py` 3 passed.
+- [x] Step 17 — Tuned vs. untuned comparison and export (2026-11-18) — `results/tuned_vs_untuned.csv` compares both variants on identical folds and student-test data: tuned 0.8671 vs untuned 0.8858 CV Macro F1, but tuned inference 69 ms vs 150 ms. Exported a 15 MB compressed `artifacts/model.joblib` plus `config.json` (feature order, params, thresholds, versions) and `hmm.json`. Fresh-process prediction parity verified; `pytest tests/test_artifacts.py` 5 passed.

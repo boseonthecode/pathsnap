@@ -27,6 +27,8 @@ DEFAULT_SEED: int = 42
 CV_SEED: int = 42
 PERTURBATION_SEED: int = 42
 N_SPLITS: int = 5
+CV_MAX_OBSERVATIONS_PER_TRIP: int = 300
+TEST_MAX_OBSERVATIONS_PER_TRIP: int = 800
 
 # ---------------------------------------------------------------------------
 # Candidate generation

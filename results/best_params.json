@@ -1,0 +1,13 @@
+{
+  "best_cv_macro_f1": 0.8670682515389512,
+  "best_params": {
+    "class_weight": "balanced_subsample",
+    "criterion": "gini",
+    "max_depth": 12,
+    "max_features": 0.5,
+    "min_samples_leaf": 10,
+    "n_estimators": 200
+  },
+  "completed_trials": 15,
+  "model": "extra_trees"
+}
