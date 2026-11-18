@@ -12,12 +12,19 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 from sklearn.base import BaseEstimator
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import (
+    AdaBoostClassifier,
+    ExtraTreesClassifier,
+    HistGradientBoostingClassifier,
+    RandomForestClassifier,
+)
+from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier
 
 from lightgbm import LGBMClassifier
 
@@ -122,6 +129,68 @@ def _shallow_mlp(seed: int) -> BaseEstimator:
     )
 
 
+def _hist_gradient_boosting(seed: int) -> BaseEstimator:
+    return HistGradientBoostingClassifier(
+        max_iter=300,
+        learning_rate=0.08,
+        max_leaf_nodes=31,
+        l2_regularization=1e-3,
+        class_weight="balanced",
+        early_stopping=False,
+        random_state=seed,
+    )
+
+
+def _random_forest(seed: int) -> BaseEstimator:
+    return RandomForestClassifier(
+        n_estimators=200,
+        min_samples_leaf=2,
+        class_weight="balanced_subsample",
+        random_state=seed,
+        n_jobs=-1,
+    )
+
+
+def _decision_tree(seed: int) -> BaseEstimator:
+    return DecisionTreeClassifier(
+        max_depth=14,
+        min_samples_leaf=10,
+        class_weight="balanced",
+        random_state=seed,
+    )
+
+
+def _gaussian_nb(seed: int) -> BaseEstimator:
+    return GaussianNB()
+
+
+def _sgd_logistic(seed: int) -> BaseEstimator:
+    return Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            (
+                "classifier",
+                SGDClassifier(
+                    loss="log_loss",
+                    alpha=1e-4,
+                    max_iter=1500,
+                    tol=1e-3,
+                    class_weight="balanced",
+                    random_state=seed,
+                ),
+            ),
+        ]
+    )
+
+
+def _adaboost(seed: int) -> BaseEstimator:
+    return AdaBoostClassifier(
+        n_estimators=150,
+        learning_rate=0.05,
+        random_state=seed,
+    )
+
+
 MODEL_SPECS: dict[str, ModelSpec] = {
     "logistic_regression": ModelSpec(
         name="logistic_regression",
@@ -177,6 +246,65 @@ MODEL_SPECS: dict[str, ModelSpec] = {
             "scaler": "standard",
         },
         factory=_shallow_mlp,
+    ),
+    "hist_gradient_boosting": ModelSpec(
+        name="hist_gradient_boosting",
+        family="boosting_hist",
+        params={
+            "max_iter": 300,
+            "learning_rate": 0.08,
+            "max_leaf_nodes": 31,
+            "l2_regularization": 1e-3,
+            "class_weight": "balanced",
+        },
+        factory=_hist_gradient_boosting,
+    ),
+    "random_forest": ModelSpec(
+        name="random_forest",
+        family="ensemble_forest",
+        params={
+            "n_estimators": 200,
+            "min_samples_leaf": 2,
+            "class_weight": "balanced_subsample",
+        },
+        factory=_random_forest,
+    ),
+    "decision_tree": ModelSpec(
+        name="decision_tree",
+        family="tree",
+        params={
+            "max_depth": 14,
+            "min_samples_leaf": 10,
+            "class_weight": "balanced",
+        },
+        factory=_decision_tree,
+    ),
+    "gaussian_nb": ModelSpec(
+        name="gaussian_nb",
+        family="probabilistic",
+        params={},
+        factory=_gaussian_nb,
+    ),
+    "sgd_logistic": ModelSpec(
+        name="sgd_logistic",
+        family="linear_sgd",
+        params={
+            "loss": "log_loss",
+            "alpha": 1e-4,
+            "max_iter": 1500,
+            "class_weight": "balanced",
+            "scaler": "standard",
+        },
+        factory=_sgd_logistic,
+    ),
+    "adaboost": ModelSpec(
+        name="adaboost",
+        family="boosting_adaptive",
+        params={
+            "n_estimators": 150,
+            "learning_rate": 0.05,
+        },
+        factory=_adaboost,
     ),
 }
 

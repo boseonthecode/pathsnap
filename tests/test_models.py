@@ -20,13 +20,7 @@ from pathsnap.models import (
 )
 from conftest import write_trip
 
-ALL_MODELS = [
-    "logistic_regression",
-    "knn",
-    "extra_trees",
-    "lightgbm",
-    "mlp",
-]
+ALL_MODELS = list(MODEL_SPECS)
 
 
 def _training_rows(tmp_path: Path):
