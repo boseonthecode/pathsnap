@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Data — provided per-trip datasets are never committed
+data/
+
+# Local agent/tool state
+.commandcode/
+
+# Generated caches
+.cache/
+pathsnap_cache/
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Large generated artifacts (override if a small required artifact must ship)
+*.log
