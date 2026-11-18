@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-11-18T11:20:39.709200+00:00",
+  "model": "ExtraTreesClassifier",
+  "decoder": "HMM / Viterbi + monotonic point refinement",
+  "params": {
+    "n_estimators": 200,
+    "min_samples_leaf": 10,
+    "class_weight": "balanced_subsample",
+    "max_depth": 12,
+    "max_features": 0.5,
+    "criterion": "gini"
+  },
+  "feature_count": 10,
+  "training_trips": 80,
+  "max_observations_per_trip": 1000,
+  "cv": {
+    "macro_f1": 0.8546253690683677,
+    "top1_accuracy": 0.7885943630402446,
+    "log_loss": 0.2545092130125619,
+    "precision": 0.6789370589170225,
+    "recall": 0.8838904272599837,
+    "macro_f1_std": 0.025089899022039706,
+    "folds": 5
+  },
+  "partitions": {
+    "student_test": {
+      "macro_f1": 0.8628989068423463,
+      "top1_accuracy": 0.8093346573982125,
+      "log_loss": 0.2382298640710717,
+      "precision": 0.6886606243705942,
+      "recall": 0.8960637349965931,
+      "scored_points": 19133,
+      "candidate_rows": 113588,
+      "trip_count": 10,
+      "mean_trip_classifier_macro_f1": 0.8734524173598658,
+      "mean_trip_classifier_top1": 0.8246044627968411,
+      "route_f1": 0.8967930516012705,
+      "route_precision": 0.8273471784510213,
+      "route_recall": 0.9927585368015475,
+      "route_continuity": 0.9985776156826989,
+      "rmf": 0.11166370958039637,
+      "alignment_coverage": 0.9993178372915613,
+      "decoded_mean_trip_top1": 0.9652568240220198,
+      "decoded_pooled_top1": 0.9562013275492605,
+      "decoded_mean_trip_macro_f1": 0.9802639474790441,
+      "decoded_pooled_macro_f1": 0.9743695452977603
+    },
+    "evaluator_test": {
+      "macro_f1": 0.8356112831601983,
+      "top1_accuracy": 0.7430926576095253,
+      "log_loss": 0.2707114065187561,
+      "precision": 0.6409235668789809,
+      "recall": 0.8636456523960355,
+      "scored_points": 19653,
+      "candidate_rows": 116971,
+      "trip_count": 10,
+      "mean_trip_classifier_macro_f1": 0.8788112000653454,
+      "mean_trip_classifier_top1": 0.8272171384324203,
+      "route_f1": 0.8594163192362009,
+      "route_precision": 0.7882180816146565,
+      "route_recall": 0.9815985818645299,
+      "route_continuity": 0.9980392156862745,
+      "rmf": 0.10631214179370838,
+      "alignment_coverage": 0.9996936095710535,
+      "decoded_mean_trip_top1": 0.96844643342456,
+      "decoded_pooled_top1": 0.9671805831170813,
+      "decoded_mean_trip_macro_f1": 0.9830256549871612,
+      "decoded_pooled_macro_f1": 0.9813745466123557
+    }
+  },
+  "protocol": "Five trip-disjoint folds, seed 42. Classifier test metrics pool candidate rows / observations. Decoder and route metrics are mean-trip unless explicitly marked pooled. Evaluator data used only for frozen scoring.",
+  "definitions": {
+    "macro_f1": "Mean binary candidate F1 across match/non-match classes, classifier threshold 0.5.",
+    "decoder_macro_f1": "Binary candidate Macro F1 after the decoder selects roads; mean across evaluator trips.",
+    "route_f1": "Harmonic mean of sequence-aligned route precision and recall; mean across trips.",
+    "log_loss": "Binary candidate probability log loss before decoding. Lower is better.",
+    "cv": "Mean of five classifier validation folds. Decoder settings were selected separately; this is not nested CV."
+  }
+}

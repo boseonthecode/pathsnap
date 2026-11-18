@@ -153,12 +153,16 @@ def _score(
         masked_labels = labels[mask]
         predictions = (masked_probabilities >= 0.5).astype(np.int8)
         macro_f1 = candidate_macro_f1(masked_labels, predictions)
+        decoded_predictions = (
+            candidate_arcs[mask] == result.point_arc_ids[observation_indices[mask]]
+        ).astype(np.int8)
+        decoder_macro_f1 = candidate_macro_f1(masked_labels, decoded_predictions)
         log_loss_value = candidate_log_loss(masked_labels, masked_probabilities)
         precision, recall_candidate = candidate_precision_recall(
             masked_labels, predictions
         )
     else:
-        macro_f1 = log_loss_value = precision = recall_candidate = 0.0
+        macro_f1 = decoder_macro_f1 = log_loss_value = precision = recall_candidate = 0.0
 
     precision_route, recall_route = route_precision_recall(
         result.predicted_arcs, runtime_trip.route
@@ -169,6 +173,9 @@ def _score(
             alignment.arc_ids, result.point_arc_ids, alignment.alignable
         ),
         "macro_f1": float(macro_f1),
+        "decoder_macro_f1": float(decoder_macro_f1),
+        "route_f1": float(2 * precision_route * recall_route / (precision_route + recall_route))
+        if precision_route + recall_route else 0.0,
         "precision": float(precision),
         "recall": float(recall_candidate),
         "log_loss": float(log_loss_value),

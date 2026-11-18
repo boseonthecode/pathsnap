@@ -11,6 +11,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 import pathsnap
 from api import deps, schemas
@@ -148,6 +149,8 @@ def create_app(service: PredictionService | None = None) -> FastAPI:
             headers={"X-Request-ID": getattr(request.state, "request_id", "")},
         )
 
+    # The UI and API share an origin when launched with the included launcher.
+    app.mount('/ui', StaticFiles(directory=config.PROJECT_ROOT / 'ui', html=True), name='ui')
     return app
 
 

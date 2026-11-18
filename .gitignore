@@ -11,8 +11,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Data — provided per-trip datasets are never committed
-data/
+# Provided train, student-test, and evaluator datasets are tracked at the owner's request.
 
 # Local agent/tool state
 .commandcode/
@@ -34,3 +33,7 @@ pathsnap_cache/
 
 # Large generated artifacts (override if a small required artifact must ship)
 *.log
+
+# The promoted model is tracked once, under artifacts/.
+results/decoder_optimization/model.joblib
+results/live_demo/

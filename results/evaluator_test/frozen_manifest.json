@@ -1,0 +1,14 @@
+{
+  "protocol": "Frozen before evaluator scoring; no training or parameter search in this script",
+  "data_dir": "C:\\Users\\Bhadra\\OneDrive\\Documents\\ChatGPT\\ml hackathon\\ml_hackathon_26\\data\\evaluator_test",
+  "artifacts": {
+    "baseline": {
+      "model.joblib": "532591b5c7800e1e307392d695e2ff70bdbfb4507f05a83a9b3a82aeda23b3a2",
+      "hmm.json": "e7fe3f069df7997bd704d70778b9c542b7b42474c577242d7ffd122166a438be"
+    },
+    "optimized": {
+      "model.joblib": "52c44914b43eb931ce9fbf0edd972c97fba933dd895367a64d81209edb03bf13",
+      "hmm.json": "7952e9b8a626c42e40e60fc12becfe2da987395cd487383cf5c8230d214fa38a"
+    }
+  }
+}

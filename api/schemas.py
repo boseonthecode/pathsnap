@@ -60,6 +60,8 @@ class CandidatePoint(BaseModel):
 class PredictionMetrics(BaseModel):
     top1_accuracy: float
     macro_f1: float
+    decoder_macro_f1: float = 0.0
+    route_f1: float = 0.0
     precision: float
     recall: float
     log_loss: float

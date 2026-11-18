@@ -16,8 +16,9 @@ from scipy.special import logsumexp
 
 from pathsnap import config
 from pathsnap.candidates import Candidate, CandidateSet
-from pathsnap.geometry import build_directed_graph, projection_for_trip
+from pathsnap.geometry import build_directed_graph, projection_for_trip, point_to_segment_distance_matrix
 from pathsnap.io import Trip
+from pathsnap.labels import _monotonic_align
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,15 @@ class HMMConfig:
     emission: str = config.HMM_EMISSION
     gaussian_sigma_m: float = config.HMM_GAUSSIAN_SIGMA_M
     max_path_m: float = config.HMM_MAX_PATH_M
+    backward_tolerance_m: float = 0.0
+    distance_weight: float = 0.0
+    refine_points: bool = False
+
+    def __post_init__(self) -> None:
+        if self.beta_m <= 0 or self.gaussian_sigma_m <= 0:
+            raise ValueError("beta_m and gaussian_sigma_m must be positive")
+        if self.backward_tolerance_m < 0 or self.distance_weight < 0:
+            raise ValueError("backward_tolerance_m and distance_weight must be nonnegative")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -45,6 +55,9 @@ class HMMConfig:
             "emission": self.emission,
             "gaussian_sigma_m": self.gaussian_sigma_m,
             "max_path_m": self.max_path_m,
+            "backward_tolerance_m": self.backward_tolerance_m,
+            "distance_weight": self.distance_weight,
+            "refine_points": self.refine_points,
         }
 
 
@@ -83,12 +96,19 @@ class NetworkDistance:
             self._source_cache[source] = distances
         return distances.get(target)
 
-    def candidate_distance(self, first: Candidate, second: Candidate) -> float | None:
+    def candidate_distance(
+        self, first: Candidate, second: Candidate, backward_tolerance_m: float = 0.0
+    ) -> float | None:
         """Network distance from the first projection through to the second."""
         tail = (1.0 - first.along_fraction) * first.arc_length_m
         head = second.along_fraction * second.arc_length_m
 
         if first.arc_id == second.arc_id:
+            backward_m = (first.along_fraction - second.along_fraction) * first.arc_length_m
+            if 0 < backward_m <= backward_tolerance_m:
+                # A small projection reversal can be observation noise while
+                # the vehicle stays on the same directed road.
+                return 0.0
             if second.along_fraction >= first.along_fraction:
                 return (second.along_fraction - first.along_fraction) * first.arc_length_m
             # Re-entering the same directed arc requires a loop.
@@ -149,7 +169,9 @@ def transition_log_matrix(
     matrix = np.empty((len(previous), len(current)), dtype=np.float64)
     for i, first in enumerate(previous):
         for j, second in enumerate(current):
-            network_distance = network.candidate_distance(first, second)
+            network_distance = network.candidate_distance(
+                first, second, config.backward_tolerance_m
+            )
             matrix[i, j] = transition_log_probability(
                 network_distance,
                 gps_displacement_m,
@@ -229,7 +251,13 @@ def _emissions_for(
     if config.emission == "classifier":
         if probabilities is None:
             raise ValueError("Classifier emission requires candidate probabilities")
-        return classifier_log_emissions(probabilities)
+        scores = classifier_log_emissions(probabilities)
+        if config.distance_weight:
+            distances = np.array([candidate.distance_m for candidate in candidates])
+            scores = scores + config.distance_weight * gaussian_log_emissions(
+                distances, config.gaussian_sigma_m
+            )
+        return normalize_log_scores(scores)
     raise ValueError(f"Unknown emission type: {config.emission!r}")
 
 
@@ -266,7 +294,10 @@ def decode_hmm(
     gps_steps = _gps_steps(trip)
     segments = _segments(trip, groups, config.gap_split_s)
 
+    stitched: list[int] = []
+    unbridged = 0
     for segment in segments:
+        chosen_arcs = []
         emission_rows: list[np.ndarray] = []
         transition_rows: list[np.ndarray] = []
         for position, obs_index in enumerate(segment):
@@ -298,8 +329,37 @@ def decode_hmm(
                 np.exp(emission_rows[position][candidate_index])
             )
             chosen_arcs.append(candidate.arc_id)
-
-    stitched, unbridged = stitch_arc_sequence(trip, chosen_arcs, network=network)
+        segment_route, segment_unbridged = stitch_arc_sequence(
+            trip, chosen_arcs, network=network
+        )
+        if config.refine_points and segment_route:
+            # Re-align to the INFERRED route only. This uses no reference arcs.
+            # It corrects local emission/heading errors once route direction is known.
+            projection = projection_for_trip(trip)
+            xy = projection.to_xy(trip.nodes)
+            route_arcs = np.asarray(segment_route, dtype=np.int32)
+            endpoints = trip.arcs[route_arcs]
+            costs = point_to_segment_distance_matrix(
+                projection.to_xy(trip.track[segment, :2]),
+                xy[endpoints[:, 0]], xy[endpoints[:, 1]],
+            )
+            positions = _monotonic_align(costs)
+            refined = route_arcs[positions]
+            for position, obs_index in enumerate(segment):
+                arc_id = int(refined[position])
+                point_arc_ids[obs_index] = arc_id
+                # A connector may not have been in the point's candidate set.
+                point_confidences[obs_index] = next((
+                    float(np.exp(emission_rows[position][j]))
+                    for j, candidate in enumerate(groups[obs_index])
+                    if candidate.arc_id == arc_id
+                ), 0.0)
+        # Missing observations/time gaps are intentional chain breaks. Do not
+        # invent a shortest-path route through an unobserved interval.
+        if stitched and segment_route:
+            unbridged += 1
+        stitched.extend(segment_route)
+        unbridged += segment_unbridged
     return DecodeResult(
         trip_id=trip.trip_id,
         method="hmm",
