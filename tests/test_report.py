@@ -40,12 +40,12 @@ def test_pdf_exists_and_contains_required_sections() -> None:
 
 def test_report_assets_exist() -> None:
     for name in (
-        "ui_screenshot.png",
-        "api_response_terminal.png",
+        config.PROJECT_ROOT / "results" / "ui" / "route-explorer.jpg",
+        config.PROJECT_ROOT / "results" / "ui" / "model-results.jpg",
+        REPORT_DIR / "assets" / "api_response_terminal.png",
     ):
-        path = REPORT_DIR / "assets" / name
-        assert path.is_file()
-        assert path.stat().st_size > 10_000
+        assert name.is_file(), name
+        assert name.stat().st_size > 10_000
 
 
 def test_report_figures_referenced_by_markdown_exist() -> None:
