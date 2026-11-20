@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -150,56 +151,56 @@ def load_trip_artifacts(
         return None
 
     try:
-        data = np.load(npz_path)
-        candidate_meta = manifest["candidate_meta"]
-        alignment_meta = manifest["alignment_meta"]
+        with np.load(npz_path) as data:
+            candidate_meta = manifest["candidate_meta"]
+            alignment_meta = manifest["alignment_meta"]
 
-        candidates = (
-            tuple(
-                Candidate(
-                    trip_id=trip_id,
-                    obs_index=int(data["candidate_obs"][i]),
-                    arc_id=int(data["candidate_arc"][i]),
-                    distance_m=float(data["candidate_distance"][i]),
-                    proj_lon=float(data["candidate_proj_lon"][i]),
-                    proj_lat=float(data["candidate_proj_lat"][i]),
-                    along_fraction=float(data["candidate_along"][i]),
-                    heading_diff_deg=float(data["candidate_heading_diff"][i]),
-                    rank=int(data["candidate_rank"][i]),
-                    arc_length_m=float(data["candidate_arc_length"][i]),
+            candidates = (
+                tuple(
+                    Candidate(
+                        trip_id=trip_id,
+                        obs_index=int(data["candidate_obs"][i]),
+                        arc_id=int(data["candidate_arc"][i]),
+                        distance_m=float(data["candidate_distance"][i]),
+                        proj_lon=float(data["candidate_proj_lon"][i]),
+                        proj_lat=float(data["candidate_proj_lat"][i]),
+                        along_fraction=float(data["candidate_along"][i]),
+                        heading_diff_deg=float(data["candidate_heading_diff"][i]),
+                        rank=int(data["candidate_rank"][i]),
+                        arc_length_m=float(data["candidate_arc_length"][i]),
+                    )
+                    for i in range(data["candidate_arc"].shape[0])
                 )
-                for i in range(data["candidate_arc"].shape[0])
+                if load_candidates
+                else ()
             )
-            if load_candidates
-            else ()
-        )
-        candidate_set = CandidateSet(
-            trip_id=trip_id,
-            candidates=candidates,
-            n_observations=int(candidate_meta["n_observations"]),
-            n_alignable=int(candidate_meta["n_alignable"]),
-            miss_count=int(candidate_meta["miss_count"]),
-            miss_rate=float(candidate_meta["miss_rate"]),
-        )
-        feature_matrix = FeatureMatrix(
-            trip_id=trip_id,
-            feature_names=tuple(feature_names),
-            observation_indices=data["feature_observation_indices"],
-            arc_ids=data["feature_arc_ids"],
-            ranks=data["feature_ranks"],
-            features=data["feature_matrix"],
-        )
-        alignment = AlignmentResult(
-            trip_id=trip_id,
-            positions=data["alignment_positions"],
-            arc_ids=data["alignment_arc_ids"],
-            distances_m=data["alignment_distances"],
-            alignable=data["alignment_alignable"],
-            coverage=float(alignment_meta["coverage"]),
-            backward_steps=int(alignment_meta["backward_steps"]),
-            low_coverage=bool(alignment_meta["low_coverage"]),
-        )
-    except (OSError, KeyError, ValueError):
+            candidate_set = CandidateSet(
+                trip_id=trip_id,
+                candidates=candidates,
+                n_observations=int(candidate_meta["n_observations"]),
+                n_alignable=int(candidate_meta["n_alignable"]),
+                miss_count=int(candidate_meta["miss_count"]),
+                miss_rate=float(candidate_meta["miss_rate"]),
+            )
+            feature_matrix = FeatureMatrix(
+                trip_id=trip_id,
+                feature_names=tuple(feature_names),
+                observation_indices=data["feature_observation_indices"],
+                arc_ids=data["feature_arc_ids"],
+                ranks=data["feature_ranks"],
+                features=data["feature_matrix"],
+            )
+            alignment = AlignmentResult(
+                trip_id=trip_id,
+                positions=data["alignment_positions"],
+                arc_ids=data["alignment_arc_ids"],
+                distances_m=data["alignment_distances"],
+                alignable=data["alignment_alignable"],
+                coverage=float(alignment_meta["coverage"]),
+                backward_steps=int(alignment_meta["backward_steps"]),
+                low_coverage=bool(alignment_meta["low_coverage"]),
+            )
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile, EOFError):
         return None
 
     return TripArtifacts(

@@ -4,21 +4,20 @@ from __future__ import annotations
 
 import argparse
 import time
-from dataclasses import fields, replace
+from dataclasses import replace
 from pathlib import Path
 
 import _bootstrap  # noqa: F401
 import pandas as pd
 
 from pathsnap import config
-from pathsnap.artifacts import load_model_artifact, read_json, write_json
+from pathsnap.artifacts import load_hmm_config, load_model_artifact, write_json
 from pathsnap.evaluate import (
     evaluate_decoders,
     prepare_trip_inference,
     tune_decoder_betas,
     write_decoder_failure_analysis,
 )
-from pathsnap.hmm import HMMConfig
 from pathsnap.io import iter_trips
 from pathsnap.viz import generate_decoder_plots
 
@@ -32,14 +31,6 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _base_hmm_config(path: Path) -> HMMConfig:
-    if not path.is_file():
-        return HMMConfig()
-    payload = read_json(path)
-    allowed = {field.name for field in fields(HMMConfig)}
-    return HMMConfig(**{key: value for key, value in payload.items() if key in allowed})
-
-
 def main() -> None:
     args = _parse_args()
     paths = config.get_paths()
@@ -50,7 +41,7 @@ def main() -> None:
 
     start = time.perf_counter()
     artifact = load_model_artifact(paths.artifact_dir / "model.joblib")
-    base_config = _base_hmm_config(paths.artifact_dir / "hmm.json")
+    base_config = load_hmm_config(paths.artifact_dir / "hmm.json")
 
     train_trips = list(iter_trips(paths.train_data_dir, "train"))
     test_trips = list(iter_trips(paths.test_data_dir, "test"))

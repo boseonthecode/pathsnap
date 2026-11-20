@@ -10,6 +10,7 @@ distance to the route is within a configurable threshold.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 import numpy as np
 
@@ -50,7 +51,7 @@ def _monotonic_align(cost: np.ndarray) -> np.ndarray:
     if n_obs == 0 or n_pos == 0:
         return np.full(n_obs, -1, dtype=np.int32)
 
-    backpointer_dtype = np.int16 if n_pos < np.iinfo(np.int16).max else np.int32
+    backpointer_dtype = np.int32
     backpointers = np.full((n_obs, n_pos), -1, dtype=backpointer_dtype)
     dp = cost[0].astype(np.float64, copy=True)
     positions_range = np.arange(n_pos)
@@ -120,7 +121,12 @@ def align_observations(
         positions[alignable_indices] = aligned
 
     arc_ids = np.full(n_obs, -1, dtype=np.int32)
-    arc_ids[alignable] = trip.route[positions[alignable]]
+    aligned_positions = positions[alignable]
+    if aligned_positions.size and not (
+        0 <= aligned_positions.min() and aligned_positions.max() < trip.route.size
+    ):
+        raise ValueError("Aligned route positions fall outside the reference route")
+    arc_ids[alignable] = trip.route[aligned_positions]
 
     backward_steps = int(np.count_nonzero(np.diff(positions[alignable]) < 0))
     coverage = float(np.mean(alignable)) if n_obs else 0.0
@@ -135,3 +141,30 @@ def align_observations(
         backward_steps=backward_steps,
         low_coverage=coverage < config.LOW_COVERAGE_THRESHOLD,
     )
+
+
+def align_to_inferred_route(
+    trip: Trip,
+    arc_ids: Sequence[int],
+    observation_indices: Sequence[int],
+) -> np.ndarray:
+    """Monotonically align observations to an *inferred* arc sequence.
+
+    Used to refine point predictions once the decoded route direction is known.
+    It never consults the reference route, only the inferred arcs and the GPS
+    track, and returns one arc id per supplied observation.
+    """
+    route = np.asarray(arc_ids, dtype=np.int32)
+    indices = np.asarray(observation_indices, dtype=np.int64)
+    if route.size == 0 or indices.size == 0:
+        return np.empty(0, dtype=np.int32)
+
+    projection = projection_for_trip(trip)
+    node_xy = projection.to_xy(trip.nodes)
+    endpoints = trip.arcs[route]
+    costs = point_to_segment_distance_matrix(
+        projection.to_xy(trip.track[indices, :2]),
+        node_xy[endpoints[:, 0]],
+        node_xy[endpoints[:, 1]],
+    )
+    return route[_monotonic_align(costs)]

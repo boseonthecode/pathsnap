@@ -13,10 +13,10 @@ from pathsnap.dataset import build_trip_dataset
 from pathsnap.io import load_trip
 from pathsnap.models import (
     MODEL_SPECS,
+    candidate_top1_accuracy,
     evaluate_model,
     fit_model,
     model_configs,
-    observation_top1_accuracy,
 )
 from conftest import write_trip
 
@@ -82,13 +82,13 @@ def test_model_reloads_from_saved_artifact_and_predicts(
     assert np.all(probabilities >= 0.0) and np.all(probabilities <= 1.0)
 
 
-def test_observation_top1_accuracy_picks_best_candidate_per_observation() -> None:
+def test_candidate_top1_accuracy_picks_best_candidate_per_observation() -> None:
     probabilities = np.array([0.9, 0.1, 0.2, 0.8])
     labels = np.array([1, 0, 0, 1])
     observation_indices = np.array([0, 0, 1, 1])
 
-    assert observation_top1_accuracy(probabilities, labels, observation_indices) == 1.0
+    assert candidate_top1_accuracy(probabilities, labels, observation_indices) == 1.0
 
     flipped = np.array([0.1, 0.9, 0.2, 0.8])
-    assert observation_top1_accuracy(flipped, labels, observation_indices) == 0.5
-    assert observation_top1_accuracy(np.array([]), np.array([]), np.array([])) == 0.0
+    assert candidate_top1_accuracy(flipped, labels, observation_indices) == 0.5
+    assert candidate_top1_accuracy(np.array([]), np.array([]), np.array([])) == 0.0

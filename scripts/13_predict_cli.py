@@ -9,8 +9,7 @@ import _bootstrap  # noqa: F401
 import numpy as np
 
 from pathsnap import config
-from pathsnap.artifacts import load_model_artifact
-from pathsnap.hmm import HMMConfig
+from pathsnap.artifacts import load_hmm_config, load_model_artifact
 from pathsnap.io import discover_trip_dirs, load_trip
 from pathsnap.pipeline import predict_trip
 
@@ -45,7 +44,7 @@ def main() -> None:
 
     print('Loading saved ExtraTreesClassifier...', flush=True)
     artifact = load_model_artifact(args.artifact_dir/'model.joblib')
-    settings = HMMConfig(**json.loads((args.artifact_dir/'hmm.json').read_text()))
+    settings = load_hmm_config(args.artifact_dir / 'hmm.json')
     print(f'Model: {artifact.model_name} | trees={artifact.params.get("n_estimators")} | depth={artifact.params.get("max_depth")} | features={len(artifact.feature_names)}')
     print(f'Method: {args.method} | noise={args.noise:g} m | sampling={args.sample_seconds:g} s')
     print(f'Data: {args.data_dir.resolve()}')

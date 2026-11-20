@@ -6,7 +6,6 @@ only predictions, layers, and aggregate metrics.
 
 from __future__ import annotations
 
-from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +21,7 @@ from api.schemas import (
     TripSummary,
 )
 from pathsnap import config
-from pathsnap.artifacts import ModelArtifact, load_model_artifact, read_json
+from pathsnap.artifacts import ModelArtifact, load_hmm_config, load_model_artifact, read_json
 from pathsnap.hmm import HMMConfig
 from pathsnap.io import Trip, discover_trip_dirs, iter_trips
 from pathsnap.pipeline import PredictionResult, predict_trip
@@ -60,15 +59,9 @@ class PredictionService:
             )
 
     def _load_hmm_config(self) -> HMMConfig:
-        payload: dict[str, Any] = {}
-        hmm_path = self.artifact_dir / "hmm.json"
-        config_path = self.artifact_dir / "config.json"
-        if hmm_path.is_file():
-            payload.update(read_json(hmm_path))
-        elif config_path.is_file():
-            payload.update(read_json(config_path).get("hmm", {}))
-        allowed = {field.name for field in fields(HMMConfig)}
-        return HMMConfig(**{key: value for key, value in payload.items() if key in allowed})
+        return load_hmm_config(
+            self.artifact_dir / "hmm.json", fallback=self.artifact_dir / "config.json"
+        )
 
     @property
     def model_loaded(self) -> bool:

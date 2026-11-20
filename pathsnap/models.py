@@ -309,6 +309,19 @@ MODEL_SPECS: dict[str, ModelSpec] = {
 }
 
 
+def positive_class_probability(estimator: Any, features: np.ndarray) -> np.ndarray:
+    """Probability of the positive (true-arc) class for each row.
+
+    Shared by :class:`TrainedModel` and :class:`pathsnap.artifacts.ModelArtifact`
+    so a reloaded estimator scores identically to the freshly fitted one.
+    """
+    probabilities = estimator.predict_proba(features)
+    classes = list(getattr(estimator, "classes_", [0, 1]))
+    if 1 in classes:
+        return probabilities[:, classes.index(1)]
+    return np.zeros(probabilities.shape[0], dtype=np.float64)
+
+
 @dataclass
 class TrainedModel:
     """A fitted estimator plus provenance and timing."""
@@ -326,11 +339,7 @@ class TrainedModel:
             raise ValueError(
                 f"Expected {len(self.feature_names)} features, got {features.shape[1]}"
             )
-        probabilities = self.estimator.predict_proba(features)
-        classes = list(getattr(self.estimator, "classes_", [0, 1]))
-        if 1 in classes:
-            return probabilities[:, classes.index(1)]
-        return np.zeros(features.shape[0], dtype=np.float64)
+        return positive_class_probability(self.estimator, features)
 
 
 @dataclass(frozen=True)
@@ -419,12 +428,16 @@ def fit_model(
     )
 
 
-def observation_top1_accuracy(
+def candidate_top1_accuracy(
     probabilities: np.ndarray,
     labels: np.ndarray,
     observation_indices: np.ndarray,
 ) -> float:
-    """Top-1 accuracy after picking the highest-probability candidate per observation."""
+    """Top-1 accuracy after picking the highest-probability candidate per observation.
+
+    Distinct from :func:`pathsnap.metrics.observation_top1_accuracy`, which
+    compares predicted arc ids against aligned labels.
+    """
     probabilities = np.asarray(probabilities)
     labels = np.asarray(labels)
     observation_indices = np.asarray(observation_indices)
@@ -459,7 +472,7 @@ def evaluate_model(
     predictions = (probabilities >= 0.5).astype(np.int8) if probabilities.size else probabilities
     precision, recall = candidate_precision_recall(labels, predictions)
     top1 = (
-        observation_top1_accuracy(probabilities, labels, observation_indices)
+        candidate_top1_accuracy(probabilities, labels, observation_indices)
         if observation_indices is not None
         else None
     )

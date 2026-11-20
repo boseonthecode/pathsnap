@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,7 +17,8 @@ import joblib
 import numpy as np
 
 import pathsnap
-from pathsnap.models import TrainedModel
+from pathsnap.hmm import HMMConfig
+from pathsnap.models import TrainedModel, positive_class_probability
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class ModelArtifact:
     metadata: dict[str, Any]
 
     def positive_probability(self, features: np.ndarray) -> np.ndarray:
+        """Positive-class probability, rejecting a feature-order mismatch."""
         if features.ndim != 2 or features.shape[1] != len(self.feature_names):
             raise ValueError(
                 f"Expected {len(self.feature_names)} features, "
@@ -39,11 +41,7 @@ class ModelArtifact:
             )
         if features.shape[0] == 0:
             return np.empty(0, dtype=np.float64)
-        probabilities = self.estimator.predict_proba(features)
-        classes = list(getattr(self.estimator, "classes_", [0, 1]))
-        if 1 in classes:
-            return probabilities[:, classes.index(1)]
-        return np.zeros(features.shape[0], dtype=np.float64)
+        return positive_class_probability(self.estimator, features)
 
 
 def version_info() -> dict[str, str]:
@@ -156,3 +154,18 @@ def write_json(path: Path, payload: dict[str, Any]) -> Path:
 
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_hmm_config(path: Path, fallback: Path | None = None) -> HMMConfig:
+    """Load decoder settings, falling back to ``config.json["hmm"]``.
+
+    Unknown keys are dropped so an artifact written by a newer build still loads
+    against this ``HMMConfig`` definition.
+    """
+    payload: dict[str, Any] = {}
+    if path.is_file():
+        payload.update(read_json(path))
+    elif fallback is not None and fallback.is_file():
+        payload.update(read_json(fallback).get("hmm", {}))
+    allowed = {field.name for field in fields(HMMConfig)}
+    return HMMConfig(**{key: value for key, value in payload.items() if key in allowed})

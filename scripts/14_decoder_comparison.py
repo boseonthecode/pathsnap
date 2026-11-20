@@ -10,24 +10,16 @@ Run from the repository root: python scripts/14_decoder_comparison.py
 from __future__ import annotations
 
 import time
-from dataclasses import fields
 from pathlib import Path
 
 import _bootstrap  # noqa: F401
 import pandas as pd
 
 from pathsnap import config
-from pathsnap.artifacts import load_model_artifact, read_json
+from pathsnap.artifacts import load_hmm_config, load_model_artifact
 from pathsnap.evaluate import evaluate_decoders, prepare_trip_inference
-from pathsnap.hmm import HMMConfig
 from pathsnap.io import iter_trips
 from pathsnap.viz import generate_decoder_plots
-
-
-def deployed_hmm_config(path: Path) -> HMMConfig:
-    payload = read_json(path)
-    allowed = {field.name for field in fields(HMMConfig)}
-    return HMMConfig(**{k: v for k, v in payload.items() if k in allowed})
 
 
 def main() -> None:
@@ -37,7 +29,7 @@ def main() -> None:
     config.ensure_output_directories(paths)
 
     artifact = load_model_artifact(paths.artifact_dir / "model.joblib")
-    settings = deployed_hmm_config(paths.artifact_dir / "hmm.json")
+    settings = load_hmm_config(paths.artifact_dir / "hmm.json")
     print(
         f"Deployed config: beta_m={settings.beta_m:g} "
         f"refine_points={settings.refine_points} emission={settings.emission}"

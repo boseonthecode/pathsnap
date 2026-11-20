@@ -16,9 +16,14 @@ from scipy.special import logsumexp
 
 from pathsnap import config
 from pathsnap.candidates import Candidate, CandidateSet
-from pathsnap.geometry import build_directed_graph, projection_for_trip, point_to_segment_distance_matrix
+from pathsnap.geometry import (
+    Projection,
+    arc_lengths_m,
+    build_directed_graph,
+    projection_for_trip,
+)
 from pathsnap.io import Trip
-from pathsnap.labels import _monotonic_align
+from pathsnap.labels import align_to_inferred_route
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,12 @@ class HMMConfig:
             raise ValueError("beta_m and gaussian_sigma_m must be positive")
         if self.backward_tolerance_m < 0 or self.distance_weight < 0:
             raise ValueError("backward_tolerance_m and distance_weight must be nonnegative")
+        if self.top_k < 1:
+            raise ValueError("top_k must be at least 1")
+        if self.radius_m <= 0:
+            raise ValueError("radius_m must be positive")
+        if self.emission not in {"classifier", "gaussian"}:
+            raise ValueError(f"Unknown emission type: {self.emission!r}")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -261,6 +272,36 @@ def _emissions_for(
     raise ValueError(f"Unknown emission type: {config.emission!r}")
 
 
+def _validate_candidates(trip: Trip, candidate_set: CandidateSet) -> None:
+    """Boundary checks on candidate indices before any decoding happens."""
+    for candidate in candidate_set.candidates:
+        if not 0 <= candidate.obs_index < trip.n_points:
+            raise ValueError(
+                f"Candidate observation index {candidate.obs_index} outside "
+                f"[0, {trip.n_points})"
+            )
+        if not 0 <= candidate.arc_id < trip.n_arcs:
+            raise ValueError(
+                f"Candidate arc id {candidate.arc_id} outside [0, {trip.n_arcs})"
+            )
+
+
+def _probability_lookup(
+    candidate_set: CandidateSet, probabilities: np.ndarray
+) -> dict[tuple[int, int], float]:
+    """Map ``(obs_index, arc_id)`` to its probability, validating the array shape."""
+    probabilities = np.asarray(probabilities, dtype=np.float64)
+    expected = (len(candidate_set.candidates),)
+    if probabilities.shape != expected:
+        raise ValueError(
+            f"probabilities has shape {probabilities.shape}, expected {expected}"
+        )
+    return {
+        (candidate.obs_index, candidate.arc_id): float(probability)
+        for candidate, probability in zip(candidate_set.candidates, probabilities)
+    }
+
+
 def decode_hmm(
     trip: Trip,
     candidate_set: CandidateSet,
@@ -273,7 +314,6 @@ def decode_hmm(
     groups = candidate_set.by_observation()
     point_arc_ids = np.full(trip.n_points, -1, dtype=np.int32)
     point_confidences = np.zeros(trip.n_points, dtype=np.float64)
-    chosen_arcs: list[int] = []
     if not groups:
         return DecodeResult(
             trip.trip_id,
@@ -285,12 +325,15 @@ def decode_hmm(
             0,
         )
 
-    probability_lookup: dict[tuple[int, int], float] = {}
-    if probabilities is not None:
-        for candidate, probability in zip(candidate_set.candidates, probabilities):
-            probability_lookup[(candidate.obs_index, candidate.arc_id)] = float(probability)
+    _validate_candidates(trip, candidate_set)
+    probability_lookup = (
+        _probability_lookup(candidate_set, probabilities)
+        if probabilities is not None
+        else {}
+    )
 
     network = network or NetworkDistance(trip, config.max_path_m)
+    node_arc_lookup = _node_arc_lookup(trip)
     gps_steps = _gps_steps(trip)
     segments = _segments(trip, groups, config.gap_split_s)
 
@@ -330,21 +373,12 @@ def decode_hmm(
             )
             chosen_arcs.append(candidate.arc_id)
         segment_route, segment_unbridged = stitch_arc_sequence(
-            trip, chosen_arcs, network=network
+            trip, chosen_arcs, network=network, node_arc_lookup=node_arc_lookup
         )
         if config.refine_points and segment_route:
             # Re-align to the INFERRED route only. This uses no reference arcs.
             # It corrects local emission/heading errors once route direction is known.
-            projection = projection_for_trip(trip)
-            xy = projection.to_xy(trip.nodes)
-            route_arcs = np.asarray(segment_route, dtype=np.int32)
-            endpoints = trip.arcs[route_arcs]
-            costs = point_to_segment_distance_matrix(
-                projection.to_xy(trip.track[segment, :2]),
-                xy[endpoints[:, 0]], xy[endpoints[:, 1]],
-            )
-            positions = _monotonic_align(costs)
-            refined = route_arcs[positions]
+            refined = align_to_inferred_route(trip, segment_route, segment)
             for position, obs_index in enumerate(segment):
                 arc_id = int(refined[position])
                 point_arc_ids[obs_index] = arc_id
@@ -379,7 +413,7 @@ def decode_nearest(trip: Trip, candidate_set: CandidateSet) -> DecodeResult:
     for obs_index, candidates in groups.items():
         if not candidates:
             continue
-        best = min(candidates, key=lambda candidate: (candidate.rank, candidate.arc_id))
+        best = candidates[0]  # candidates are rank-ordered by (distance, arc_id)
         point_arc_ids[obs_index] = best.arc_id
         chosen_arcs.append(best.arc_id)
     stitched, unbridged = stitch_arc_sequence(trip, chosen_arcs)
@@ -399,10 +433,8 @@ def decode_classifier(
 ) -> DecodeResult:
     """Classifier-only baseline: highest-probability candidate per observation."""
     groups = candidate_set.by_observation()
-    probability_lookup: dict[tuple[int, int], float] = {
-        (candidate.obs_index, candidate.arc_id): float(probability)
-        for candidate, probability in zip(candidate_set.candidates, probabilities)
-    }
+    _validate_candidates(trip, candidate_set)
+    probability_lookup = _probability_lookup(candidate_set, probabilities)
     point_arc_ids = np.full(trip.n_points, -1, dtype=np.int32)
     point_confidences = np.zeros(trip.n_points, dtype=np.float64)
     chosen_arcs: list[int] = []
@@ -426,11 +458,15 @@ def decode_classifier(
     )
 
 
-def _node_arc_lookup(trip: Trip) -> dict[tuple[int, int], int]:
+def _node_arc_lookup(
+    trip: Trip, projection: Projection | None = None
+) -> dict[tuple[int, int], int]:
+    """Map each directed node pair to its shortest parallel arc, measured in metres."""
+    lengths = arc_lengths_m(trip, projection)
     lookup: dict[tuple[int, int], tuple[float, int]] = {}
     for arc_id, (from_node, to_node) in enumerate(trip.arcs):
         key = (int(from_node), int(to_node))
-        length = float(np.linalg.norm(trip.nodes[to_node] - trip.nodes[from_node]))
+        length = float(lengths[arc_id])
         current = lookup.get(key)
         if current is None or length < current[0]:
             lookup[key] = (length, arc_id)
@@ -441,11 +477,12 @@ def stitch_arc_sequence(
     trip: Trip,
     arcs: Sequence[int],
     network: NetworkDistance | None = None,
+    node_arc_lookup: dict[tuple[int, int], int] | None = None,
 ) -> tuple[list[int], int]:
     """Connect consecutive chosen arcs with directed shortest paths."""
     if not arcs:
         return [], 0
-    lookup = _node_arc_lookup(trip)
+    lookup = node_arc_lookup if node_arc_lookup is not None else _node_arc_lookup(trip)
     graph = network.graph if network is not None else build_directed_graph(trip)
 
     stitched: list[int] = [int(arcs[0])]

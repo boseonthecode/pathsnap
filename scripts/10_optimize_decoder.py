@@ -19,14 +19,19 @@ import pandas as pd
 from sklearn.base import clone
 
 from pathsnap import config
-from pathsnap.artifacts import load_model_artifact, save_model_artifact, version_info
+from pathsnap.artifacts import (
+    load_hmm_config,
+    load_model_artifact,
+    save_model_artifact,
+    version_info,
+)
 from pathsnap.cache import compute_cache_version
 from pathsnap.candidates import generate_candidates
 from pathsnap.dataset import trip_grouped_folds
 from pathsnap.evaluate import TripInference, _decode_row
 from pathsnap.features import extract_features
 from pathsnap.geometry import arc_lengths_m
-from pathsnap.hmm import HMMConfig, NetworkDistance, decode_hmm
+from pathsnap.hmm import NetworkDistance, decode_hmm
 from pathsnap.io import iter_trips
 from pathsnap.labels import align_observations
 from pathsnap.metrics import Timer
@@ -101,7 +106,7 @@ def main():
     validation_model = replace(original, estimator=model)
     inferences = [inference(prepared[t], validation_model) for t in val_ids]
     networks = [NetworkDistance(i.trip) for i in inferences]
-    base = HMMConfig(**json.loads((args.baseline_dir / 'hmm.json').read_text()))
+    base = load_hmm_config(args.baseline_dir / 'hmm.json')
     candidates = [base]
     for tolerance in (10., 30., 60.):
         for beta in (2., 10., 50.):
@@ -109,7 +114,7 @@ def main():
                 candidates.append(replace(base, backward_tolerance_m=tolerance, beta_m=beta, distance_weight=weight))
     prefix = 'validation'
     if args.refine_best:
-        selected = HMMConfig(**json.loads((out / 'hmm.json').read_text()))
+        selected = load_hmm_config(out / 'hmm.json')
         candidates = [replace(selected, refine_points=False), replace(selected, refine_points=True)]
         prefix = 'refinement_validation'
     rows = []
