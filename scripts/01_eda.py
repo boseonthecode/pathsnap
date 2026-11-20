@@ -43,7 +43,15 @@ def main() -> None:
     report_path = results_dir / "eda_report.md"
     write_eda_report(frame, report_path)
 
-    map_trip_id = args.map_trip or discover_trip_dirs(paths.train_data_dir)[0].name
+    train_trip_ids = [path.name for path in discover_trip_dirs(paths.train_data_dir)]
+    if not train_trip_ids:
+        raise SystemExit(f"No training trips found in {paths.train_data_dir}")
+    map_trip_id = args.map_trip or train_trip_ids[0]
+    if args.map_trip and args.map_trip not in train_trip_ids:
+        raise SystemExit(
+            f"Unknown --map-trip {args.map_trip!r}; available: "
+            f"{', '.join(train_trip_ids[:5])}..."
+        )
     map_trip = load_trip(paths.train_data_dir / map_trip_id, partition="train")
     map_path = build_eda_map(map_trip, results_dir / "folium" / f"eda_{map_trip_id}.html")
 

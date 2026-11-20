@@ -15,7 +15,7 @@ from pathsnap.folium_maps import (
     build_static_preview,
     predict_for_map,
 )
-from pathsnap.io import load_trip
+from pathsnap.io import discover_trip_dirs, load_trip
 
 
 def _parse_args() -> argparse.Namespace:
@@ -48,7 +48,7 @@ def main() -> None:
 
     artifact = load_model_artifact(paths.artifact_dir / "model.joblib")
     hmm_config = load_hmm_config(paths.artifact_dir / "hmm.json")
-    trip_ids = sorted(path.name for path in paths.test_data_dir.iterdir() if path.is_dir())
+    trip_ids = [path.name for path in discover_trip_dirs(paths.test_data_dir)]
     chosen = _select_trips(results_dir / "hmm_comparison.csv", trip_ids)
     print(f"Generating maps for: {chosen}")
 

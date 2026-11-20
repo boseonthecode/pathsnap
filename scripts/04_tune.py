@@ -16,6 +16,7 @@ from pathsnap.artifacts import (
     write_json,
 )
 from pathsnap.dataset import assemble_dataset
+from pathsnap.hmm import HMMConfig
 from pathsnap.io import iter_trips
 from pathsnap.tune import (
     compare_tuned_vs_untuned,
@@ -25,15 +26,8 @@ from pathsnap.tune import (
 
 
 def _hmm_config() -> dict[str, object]:
-    return {
-        "top_k": config.HMM_TOP_K,
-        "radius_m": config.HMM_RADIUS_M,
-        "max_radius_m": config.HMM_MAX_RADIUS_M,
-        "beta_m": config.HMM_BETA_M,
-        "invalid_penalty": config.HMM_INVALID_PENALTY,
-        "gap_split_s": config.HMM_GAP_SPLIT_S,
-        "emission": config.HMM_EMISSION,
-    }
+    """Persist the full decoder configuration, not a hand-picked subset."""
+    return HMMConfig().to_dict()
 
 
 def _parse_args() -> argparse.Namespace:
