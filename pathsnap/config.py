@@ -28,6 +28,7 @@ CV_SEED: int = 42
 PERTURBATION_SEED: int = 42
 N_SPLITS: int = 5
 CV_MAX_OBSERVATIONS_PER_TRIP: int = 300
+TRAIN_MAX_OBSERVATIONS_PER_TRIP: int = 1000
 TEST_MAX_OBSERVATIONS_PER_TRIP: int = 800
 
 # ---------------------------------------------------------------------------
@@ -36,6 +37,8 @@ TEST_MAX_OBSERVATIONS_PER_TRIP: int = 800
 CANDIDATE_RADIUS_M: float = 50.0
 CANDIDATE_MAX_RADIUS_M: float = 200.0
 CANDIDATE_TOP_K: int = 8
+CANDIDATE_THRESHOLD: float = 0.5
+MAX_CANDIDATE_LAYER_POINTS: int = 3000
 
 # ---------------------------------------------------------------------------
 # Label alignment
@@ -55,6 +58,7 @@ HMM_GAP_SPLIT_S: float = 30.0
 HMM_EMISSION: str = "classifier"
 HMM_GAUSSIAN_SIGMA_M: float = 20.0
 HMM_MAX_PATH_M: float = 2000.0
+HMM_BETA_GRID: tuple[float, ...] = (5.0, 10.0, 20.0, 50.0)
 
 # ---------------------------------------------------------------------------
 # UTM selection

@@ -15,6 +15,7 @@ from pathsnap import config
 from pathsnap.artifacts import load_model_artifact
 from pathsnap.dataset import trip_grouped_folds
 from pathsnap.io import iter_trips
+from pathsnap.labels import candidate_labels
 from pathsnap.hmm import HMMConfig, decode_hmm
 
 helpers = importlib.import_module('10_optimize_decoder')
@@ -26,7 +27,7 @@ def classify(payload, model):
     obs = np.array([c.obs_index for c in candidates.candidates], dtype=int)
     arcs = np.array([c.arc_id for c in candidates.candidates], dtype=int)
     mask = alignment.alignable[obs]
-    y = (arcs[mask] == alignment.arc_ids[obs[mask]]).astype(int)
+    y = candidate_labels(alignment, obs[mask], arcs[mask]).astype(int)
     selected = np.full(trip.n_points, -1, dtype=int)
     starts = np.r_[0, np.flatnonzero(np.diff(obs)) + 1]
     ends = np.r_[starts[1:], len(obs)]
@@ -40,11 +41,12 @@ def classify(payload, model):
 def aggregate(items):
     y = np.concatenate([i[0] for i in items])
     p = np.concatenate([i[1] for i in items])
-    return dict(macro_f1=float(f1_score(y, p >= .5, average='macro', labels=[0, 1], zero_division=0)),
+    predicted = p >= config.CANDIDATE_THRESHOLD
+    return dict(macro_f1=float(f1_score(y, predicted, average='macro', labels=[0, 1], zero_division=0)),
                 top1_accuracy=sum(i[2] for i in items)/sum(i[3] for i in items),
                 log_loss=float(log_loss(y, p, labels=[0, 1])),
-                precision=float(precision_score(y, p >= .5, zero_division=0)),
-                recall=float(recall_score(y, p >= .5, zero_division=0)),
+                precision=float(precision_score(y, predicted, zero_division=0)),
+                recall=float(recall_score(y, predicted, zero_division=0)),
                 scored_points=sum(i[3] for i in items), candidate_rows=len(y))
 
 

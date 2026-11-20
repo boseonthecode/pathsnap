@@ -133,6 +133,14 @@ def route_precision_recall(
     return float(matched / predicted.size), float(matched / reference.size)
 
 
+def route_f1(precision: float, recall: float) -> float:
+    """Harmonic mean of route precision and recall, zero-safe."""
+    total = precision + recall
+    if total == 0.0:
+        return 0.0
+    return float(2.0 * precision * recall / total)
+
+
 def route_mismatch_fraction(
     predicted: np.ndarray,
     reference: np.ndarray,

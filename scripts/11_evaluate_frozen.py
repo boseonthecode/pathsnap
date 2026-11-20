@@ -15,7 +15,8 @@ from pathsnap.artifacts import load_model_artifact
 from pathsnap.evaluate import prepare_trip_inference, _decode_row
 from pathsnap.hmm import HMMConfig, NetworkDistance, decode_hmm
 from pathsnap.io import iter_trips
-from pathsnap.metrics import Timer, candidate_macro_f1
+from pathsnap.labels import candidate_labels
+from pathsnap.metrics import Timer, candidate_macro_f1, route_f1
 
 
 def sha256(path):
@@ -53,13 +54,14 @@ def main():
                 result = decode_hmm(trip, inf.candidates, inf.probabilities, settings[name], network)
             row = _decode_row(inf, result, timer.elapsed_ms)
             row['variant'] = name
-            p, r = row['route_precision'], row['route_recall']
-            row['route_f1'] = 2*p*r/(p+r) if p+r else 0.
+            row['route_f1'] = route_f1(row['route_precision'], row['route_recall'])
             obs = np.array([c.obs_index for c in inf.candidates.candidates])
             arcs = np.array([c.arc_id for c in inf.candidates.candidates])
             valid = inf.alignment.alignable[obs]
-            labels = arcs[valid] == inf.alignment.arc_ids[obs[valid]]
-            row['classifier_candidate_macro_f1'] = candidate_macro_f1(labels, inf.probabilities[valid] >= .5)
+            labels = candidate_labels(inf.alignment, obs[valid], arcs[valid])
+            row['classifier_candidate_macro_f1'] = candidate_macro_f1(
+                labels, inf.probabilities[valid] >= config.CANDIDATE_THRESHOLD
+            )
             row['decoded_candidate_macro_f1'] = candidate_macro_f1(labels, arcs[valid] == result.point_arc_ids[obs[valid]])
             row['n_scored_points'] = int(inf.alignment.alignable.sum())
             row['n_correct_points'] = int(np.count_nonzero(result.point_arc_ids[inf.alignment.alignable] == inf.alignment.arc_ids[inf.alignment.alignable]))

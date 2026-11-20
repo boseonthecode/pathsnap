@@ -469,7 +469,11 @@ def evaluate_model(
     """Score a fitted model, recording quality metrics and inference time."""
     with Timer() as timer:
         probabilities = trained.positive_probability(features)
-    predictions = (probabilities >= 0.5).astype(np.int8) if probabilities.size else probabilities
+    predictions = (
+        (probabilities >= config.CANDIDATE_THRESHOLD).astype(np.int8)
+        if probabilities.size
+        else probabilities
+    )
     precision, recall = candidate_precision_recall(labels, predictions)
     top1 = (
         candidate_top1_accuracy(probabilities, labels, observation_indices)

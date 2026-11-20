@@ -18,6 +18,7 @@ from pathsnap import config
 from pathsnap.cache import TripArtifacts, load_or_build_trip_artifacts
 from pathsnap.features import FEATURE_NAMES
 from pathsnap.io import Trip
+from pathsnap.labels import candidate_labels
 
 
 @dataclass(frozen=True)
@@ -106,9 +107,9 @@ def build_trip_dataset(
         row_positions = alignment.positions[observation_indices]
         route_positions = row_positions.astype(np.int32)
         labeled = row_positions >= 0
-        labels[labeled] = (
-            arc_ids[labeled] == alignment.arc_ids[observation_indices[labeled]]
-        ).astype(np.int8)
+        labels[labeled] = candidate_labels(
+            alignment, observation_indices[labeled], arc_ids[labeled]
+        )
 
     alignable_observations = set(np.flatnonzero(alignment.alignable).tolist())
     observations_with_candidates = set(

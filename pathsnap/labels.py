@@ -143,6 +143,23 @@ def align_observations(
     )
 
 
+def candidate_labels(
+    alignment: AlignmentResult,
+    observation_indices: np.ndarray,
+    arc_ids: np.ndarray,
+) -> np.ndarray:
+    """1 where a candidate arc equals its aligned label, 0 otherwise."""
+    observation_indices = np.asarray(observation_indices)
+    arc_ids = np.asarray(arc_ids)
+    if observation_indices.size != arc_ids.size:
+        raise ValueError("observation_indices and arc_ids must have the same length")
+    if observation_indices.size == 0:
+        return np.zeros(0, dtype=np.int8)
+    if observation_indices.min() < 0 or observation_indices.max() >= alignment.arc_ids.size:
+        raise ValueError("observation index outside the alignment")
+    return (arc_ids == alignment.arc_ids[observation_indices]).astype(np.int8)
+
+
 def align_to_inferred_route(
     trip: Trip,
     arc_ids: Sequence[int],

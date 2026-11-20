@@ -65,10 +65,11 @@ def training_arrays(prepared, ids):
         valid_obs = np.flatnonzero(alignment.alignable)
         if not valid_obs.size:
             continue
-        sampled = valid_obs[np.linspace(0, len(valid_obs) - 1, min(1000, len(valid_obs)), dtype=int)]
+        cap = min(config.TRAIN_MAX_OBSERVATIONS_PER_TRIP, len(valid_obs))
+        sampled = valid_obs[np.linspace(0, len(valid_obs) - 1, cap, dtype=int)]
         mask = np.isin(obs, sampled)
         xs.append(features[mask])
-        ys.append((arcs[mask] == alignment.arc_ids[obs[mask]]).astype(np.int8))
+        ys.append(candidate_labels(alignment, obs[mask], arcs[mask]))
     return np.vstack(xs), np.concatenate(ys)
 
 
@@ -81,8 +82,7 @@ def score(inf, settings, network):
     with Timer() as timer:
         decoded = decode_hmm(inf.trip, inf.candidates, inf.probabilities, settings, network)
     row = _decode_row(inf, decoded, timer.elapsed_ms)
-    p, r = row['route_precision'], row['route_recall']
-    row['route_f1'] = 2 * p * r / (p + r) if p + r else 0.0
+    row['route_f1'] = route_f1(row['route_precision'], row['route_recall'])
     return row
 
 

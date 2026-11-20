@@ -16,10 +16,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
+from pathsnap import config  # noqa: E402
+from pathsnap.eda import SEVERE_MISMATCH_COVERAGE  # noqa: E402
+
 TRAIN_COLOR = "#1f77b4"
 TEST_COLOR = "#ff7f0e"
-SEVERE_MISMATCH_COVERAGE = 0.50
-LOW_COVERAGE_THRESHOLD = 0.90
+LOW_COVERAGE_THRESHOLD = config.LOW_COVERAGE_THRESHOLD
 
 
 def _partition_colors(frame: pd.DataFrame) -> list[str]:
