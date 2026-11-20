@@ -111,6 +111,17 @@ class Paths:
             )
 
 
+def cors_origins() -> list[str]:
+    """CORS allowlist parsed from ``CORS_ORIGINS`` (comma-separated)."""
+    raw = os.getenv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+def log_level() -> str:
+    """Logging level name from ``LOG_LEVEL``."""
+    return os.getenv("LOG_LEVEL", LOG_LEVEL).upper()
+
+
 def get_paths() -> Paths:
     """Build the runtime path layout from defaults plus environment overrides.
 

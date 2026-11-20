@@ -23,7 +23,7 @@ from api.schemas import (
 from pathsnap import config
 from pathsnap.artifacts import ModelArtifact, load_hmm_config, load_model_artifact, read_json
 from pathsnap.hmm import HMMConfig
-from pathsnap.io import Trip, discover_trip_dirs, iter_trips
+from pathsnap.io import Trip, iter_trips
 from pathsnap.pipeline import PredictionResult, predict_trip
 
 
@@ -47,6 +47,7 @@ class PredictionService:
             )
 
     def _validate_feature_contract(self) -> None:
+        """Fail fast when config.json and the model disagree on feature order."""
         config_path = self.artifact_dir / "config.json"
         if not config_path.is_file():
             return
@@ -62,10 +63,6 @@ class PredictionService:
         return load_hmm_config(
             self.artifact_dir / "hmm.json", fallback=self.artifact_dir / "config.json"
         )
-
-    @property
-    def model_loaded(self) -> bool:
-        return self.artifact is not None
 
     @property
     def model_name(self) -> str:
@@ -90,6 +87,7 @@ class PredictionService:
         return summaries
 
     def get_trip(self, trip_id: str) -> Trip:
+        """Return one loaded trip, raising ``KeyError`` for unknown ids."""
         if trip_id not in self._trips:
             raise KeyError(trip_id)
         return self._trips[trip_id]
@@ -124,6 +122,10 @@ class PredictionService:
         return self._to_response(result)
 
     def _to_response(self, result: PredictionResult) -> PredictResponse:
+        """Map an internal prediction onto the public response schema.
+
+        Reference routes and labels are never part of this mapping.
+        """
         gps_points = [
             ObservationPoint(lon=float(lon), lat=float(lat), timestamp=float(timestamp))
             for lon, lat, timestamp in result.effective_track
@@ -155,7 +157,3 @@ class PredictionService:
             ),
             inference_ms=float(result.inference_ms),
         )
-
-
-def discover_eval_trip_ids(eval_data_dir: Path) -> list[str]:
-    return [path.name for path in discover_trip_dirs(eval_data_dir)]

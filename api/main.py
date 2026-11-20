@@ -30,6 +30,10 @@ def _require_service(request: Request) -> PredictionService:
 
 def create_app(service: PredictionService | None = None) -> FastAPI:
     """Build the app; tests may inject a preloaded service."""
+    logging.basicConfig(
+        level=deps.log_level(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -150,7 +154,9 @@ def create_app(service: PredictionService | None = None) -> FastAPI:
         )
 
     # The UI and API share an origin when launched with the included launcher.
-    app.mount('/ui', StaticFiles(directory=config.PROJECT_ROOT / 'ui', html=True), name='ui')
+    ui_dir = config.get_paths().project_root / "ui"
+    if ui_dir.is_dir():
+        app.mount("/ui", StaticFiles(directory=ui_dir, html=True), name="ui")
     return app
 
 
