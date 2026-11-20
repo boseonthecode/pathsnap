@@ -11,6 +11,8 @@ Abstract. PathSnap reconstructs the sequence of roads a vehicle travelled from n
 
 Reproducibility. Every number in this report is read from `results/*.csv` and `artifacts/*.json` at build time; none is transcribed by hand. `scripts/09_report.py` assembles the document, `scripts/14_decoder_comparison.py` evaluates the three decoders using `artifacts/hmm.json` unchanged (no beta search, no artifact writes), `scripts/03_train.py` produces the model comparison tables, `scripts/12_metrics_dashboard.py` produces the deployed-model metrics, and `scripts/06_e2e.py` produces the end-to-end latency figures.
 
+AI assistance. Team members used AI coding assistants for repository scaffolding, refactoring, test generation, and report drafting. All experiments, model training and tuning, decoder selection, and result verification were run by the team on the provided data; every reported number is produced by a script in `scripts/` and stored under `results/`. Team members can explain and defend each claim in this report.
+
 # 1. Dataset understanding and exploratory data analysis
 
 The dataset is organised per trip: `<trip_id>.track` (longitude, latitude, timestamp seconds), `.nodes` (longitude, latitude), `.arcs` (from_node_id, to_node_id), and `.route` (chronological reference arc ids). Row indices are the node and arc identifiers. The training partition has 80 trips and the student-testing partition has 10; evaluator trips are mounted separately and were never used.
@@ -266,9 +268,9 @@ Observations without candidates and GPS gaps longer than 30 s split the sequence
 
 | Method | Point accuracy | Continuity | Route precision | Route recall | RMF | Coverage | Decode ms |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| nearest | 0.5646 | 0.9977 | 0.1594 | 0.9839 | 8.92 | 0.9993 | 343 |
-| classifier | 0.8246 | 0.9975 | 0.1731 | 0.9884 | 7.29 | 0.9993 | 377 |
-| hmm | 0.9653 | 0.9986 | 0.8273 | 0.9928 | 0.11 | 0.9993 | 2078 |
+| nearest | 0.5646 | 0.9977 | 0.1594 | 0.9839 | 8.92 | 0.9993 | 363 |
+| classifier | 0.8246 | 0.9975 | 0.1731 | 0.9884 | 7.29 | 0.9993 | 365 |
+| hmm | 0.9653 | 0.9986 | 0.8273 | 0.9928 | 0.11 | 0.9993 | 2405 |
 
 Classifier+HMM improves point accuracy over classifier-only on 10 of the ten trips. The largest gain is trip `00000077` (+0.2493); the smallest is trip `00000000` (+0.0639). Route precision rises from 0.1731 to 0.8273, and RMF falls from 7.29 to 0.11. The gain is largest where the classifier alone picks locally plausible but disconnected arcs; connectivity constraints then repair those points. Continuity stays at or above 0.99 for every trip, so the decoder is not trading coherence for accuracy. Full detail is in `results/hmm_comparison.csv` and `results/hmm_failure_analysis.md`.
 

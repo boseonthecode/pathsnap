@@ -177,6 +177,14 @@ def build_document(paths: Paths, report_dir: Path) -> Document:
         "deployed-model metrics, and `scripts/06_e2e.py` produces the end-to-end "
         "latency figures."
     )
+    doc.para(
+        "AI assistance. Team members used AI coding assistants for repository "
+        "scaffolding, refactoring, test generation, and report drafting. All "
+        "experiments, model training and tuning, decoder selection, and result "
+        "verification were run by the team on the provided data; every reported "
+        "number is produced by a script in `scripts/` and stored under `results/`. "
+        "Team members can explain and defend each claim in this report."
+    )
 
     doc.h1("1. Dataset understanding and exploratory data analysis")
     doc.para(

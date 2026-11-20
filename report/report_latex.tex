@@ -49,6 +49,8 @@ This is the technical report for the PathSnap hackathon. The system pairs a lear
 
 \textbf{Reproducibility.} Every number in this report is read from \code{results/\allowbreak{}*.\allowbreak{}csv} and \code{artifacts/\allowbreak{}*.\allowbreak{}json} at build time; none is transcribed by hand. \code{scripts/\allowbreak{}09\_\allowbreak{}report.\allowbreak{}py} assembles the document, \code{scripts/\allowbreak{}14\_\allowbreak{}decoder\_\allowbreak{}comparison.\allowbreak{}py} evaluates the three decoders using \code{artifacts/\allowbreak{}hmm.\allowbreak{}json} unchanged (no beta search, no artifact writes), \code{scripts/\allowbreak{}03\_\allowbreak{}train.\allowbreak{}py} produces the model comparison tables, \code{scripts/\allowbreak{}12\_\allowbreak{}metrics\_\allowbreak{}dashboard.\allowbreak{}py} produces the deployed-model metrics, and \code{scripts/\allowbreak{}06\_\allowbreak{}e2e.\allowbreak{}py} produces the end-to-end latency figures.
 
+AI assistance. Team members used AI coding assistants for repository scaffolding, refactoring, test generation, and report drafting. All experiments, model training and tuning, decoder selection, and result verification were run by the team on the provided data; every reported number is produced by a script in \code{scripts/\allowbreak{}} and stored under \code{results/\allowbreak{}}. Team members can explain and defend each claim in this report.
+
 \section{1. Dataset understanding and exploratory data analysis}
 
 The dataset is organised per trip: \code{\textless{}trip\_\allowbreak{}id\textgreater{}.\allowbreak{}track} (longitude, latitude, timestamp seconds), \code{.\allowbreak{}nodes} (longitude, latitude), \code{.\allowbreak{}arcs} (from\_node\_id, to\_node\_id), and \code{.\allowbreak{}route} (chronological reference arc ids). Row indices are the node and arc identifiers. The training partition has 80 trips and the student-testing partition has 10; evaluator trips are mounted separately and were never used.
@@ -371,9 +373,9 @@ Observations without candidates and GPS gaps longer than 30 s split the sequence
 \toprule
 \textbf{Method} & \textbf{Point accuracy} & \textbf{Continuity} & \textbf{Route precision} & \textbf{Route recall} & \textbf{RMF} & \textbf{Coverage} & \textbf{Decode ms} \\
 \midrule
-nearest & 0.\allowbreak{}5646 & 0.\allowbreak{}9977 & 0.\allowbreak{}1594 & 0.\allowbreak{}9839 & 8.\allowbreak{}92 & 0.\allowbreak{}9993 & 343 \\
-classifier & 0.\allowbreak{}8246 & 0.\allowbreak{}9975 & 0.\allowbreak{}1731 & 0.\allowbreak{}9884 & 7.\allowbreak{}29 & 0.\allowbreak{}9993 & 377 \\
-hmm & 0.\allowbreak{}9653 & 0.\allowbreak{}9986 & 0.\allowbreak{}8273 & 0.\allowbreak{}9928 & 0.\allowbreak{}11 & 0.\allowbreak{}9993 & 2078 \\
+nearest & 0.\allowbreak{}5646 & 0.\allowbreak{}9977 & 0.\allowbreak{}1594 & 0.\allowbreak{}9839 & 8.\allowbreak{}92 & 0.\allowbreak{}9993 & 363 \\
+classifier & 0.\allowbreak{}8246 & 0.\allowbreak{}9975 & 0.\allowbreak{}1731 & 0.\allowbreak{}9884 & 7.\allowbreak{}29 & 0.\allowbreak{}9993 & 365 \\
+hmm & 0.\allowbreak{}9653 & 0.\allowbreak{}9986 & 0.\allowbreak{}8273 & 0.\allowbreak{}9928 & 0.\allowbreak{}11 & 0.\allowbreak{}9993 & 2405 \\
 \bottomrule
 \end{tabularx}
 \end{table}
