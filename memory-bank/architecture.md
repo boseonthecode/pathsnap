@@ -70,22 +70,39 @@ ml_hackathon_26/
 │   ├── hmm.py                     # Emission/transition, Viterbi, stitching
 │   ├── pipeline.py                # End-to-end prediction for one trip
 │   ├── artifacts.py               # Save/load model + config + HMM metadata
+│   ├── dataset.py                 # Labelled candidate rows + grouped folds
+│   ├── ablation.py                # Feature selection / ablation studies
+│   ├── eda.py                     # Trip summaries and data-quality report
+│   ├── eda_viz.py                 # Static EDA figures
+│   ├── folium_maps.py             # Interactive prediction maps
+│   ├── decoder_tuning.py          # Decoder prep cache, sampling, search grid
 │   ├── evaluate.py                # Method comparison utilities
+│   ├── report/                    # blocks.py, content.py, markdown/pdf/latex.py
 │   └── viz.py                     # matplotlib plots and report helpers
 ├── scripts/
 │   ├── 01_eda.py                  # Inventory, data quality, EDA outputs
 │   ├── 02_features.py             # Build/cache candidates + features
-│   ├── 03_train.py                # Train + compare ≥ 5 models (grouped CV)
+│   ├── _bootstrap.py              # Adds the repository root to sys.path
+│   ├── 01_eda_plots.py            # Static EDA figures
+│   ├── 03_train.py                # Train + compare 11 models (grouped CV)
 │   ├── 04_tune.py                 # Bayesian optimisation + export
 │   ├── 05_hmm.py                  # Nearest-snap vs clf vs clf+HMM comparison
 │   ├── 06_e2e.py                  # End-to-end API verification over test trips
-│   └── 07_folium.py               # Interactive report maps
+│   ├── 07_folium.py               # Interactive report maps
+│   ├── 08_feature_ablation.py     # Feature selection / ablation
+│   ├── 09_report.py               # Report orchestrator (--out-dir)
+│   ├── 10_optimize_decoder.py     # Decoder grid search + artifact export
+│   ├── 11_evaluate_frozen.py      # Frozen-artifact evaluator scoring
+│   ├── 12_metrics_dashboard.py    # Model metrics for the UI dashboard
+│   ├── 13_predict_cli.py          # Live command-line inference demo
+│   └── 14_decoder_comparison.py   # Decoder comparison at deployed settings
 ├── api/
 │   ├── __init__.py
 │   ├── main.py                    # FastAPI app, startup/shutdown, CORS
 │   ├── schemas.py                 # Pydantic request/response models
 │   ├── service.py                 # Artifact loading + prediction orchestration
-│   └── deps.py                    # Shared dependencies/config access
+│   ├── e2e.py                     # End-to-end HTTP checks
+│   └── deps.py                    # Re-exports settings resolved in config
 ├── ui/
 │   ├── index.html                 # Single-page evaluator/demo interface
 │   ├── style.css                  # Layout, panels, legend, responsive styles
@@ -102,6 +119,17 @@ ml_hackathon_26/
 │   ├── optuna_trials.csv
 │   ├── hmm_comparison.csv
 │   ├── e2e_summary.csv
+│   ├── best_params.json
+│   ├── best_decoder_params.json
+│   ├── decoder_tuning.csv
+│   ├── feature_ablation.csv
+│   ├── selected_features.json
+│   ├── model_metrics/             # Deployed-model metrics dashboard
+│   ├── evaluator_test/            # Frozen-artifact evaluator report
+│   ├── evaluator/                 # Evaluator-partition run summary
+│   ├── decoder_optimization/      # Grid-search trials and exported artifacts
+│   ├── live_demo/                 # CLI predictions (gitignored)
+│   ├── ui/                        # UI screenshots used by the report
 │   ├── figures/                   # PNG plots for the report
 │   └── folium/                    # Interactive HTML maps
 ├── tests/
@@ -116,12 +144,20 @@ ml_hackathon_26/
 │   ├── test_models.py
 │   ├── test_hmm.py
 │   ├── test_artifacts.py
+│   ├── test_pipeline.py
+│   ├── test_report.py
+│   ├── test_eda_viz.py
 │   └── test_api.py
 ├── report/
-│   ├── report.md                  # Report source content
+│   ├── report.md                  # Generated report source
 │   ├── report.pdf                 # Final PDF deliverable
+│   ├── report_latex.tex           # Generated LaTeX source
+│   ├── report_latex.pdf           # tectonic build of the LaTeX source
 │   └── assets/                    # Screenshots and exported figures
 ├── requirements.txt
+├── pytest.ini
+├── start_ui.ps1                   # Windows launcher (API + bundled UI)
+├── CLAUDE.md
 ├── README.md
 └── .gitignore
 ```
@@ -238,6 +274,15 @@ Stable ordered columns: `distance_m`, `log_distance`, `heading_diff_deg`, `speed
 | `invalid_penalty` | float | Disconnected/one-way penalty. |
 | `gap_split_s` | float | Split track on large time gaps. |
 | `emission` | enum(`classifier`,`gaussian`) | Emission source. |
+| `gaussian_sigma_m` | float | Scale of the Gaussian distance emission. |
+| `max_path_m` | float | Dijkstra cutoff for network distance. |
+| `backward_tolerance_m` | float | Allowed projection reversal on the same arc. |
+| `distance_weight` | float | Gaussian mixture weight added to classifier emissions. |
+| `refine_points` | bool | Re-align points onto the inferred route. |
+
+`HMMConfig` validates its fields on construction and `artifacts.load_hmm_config`
+loads it from `hmm.json` (falling back to `config.json["hmm"]`), dropping keys
+an older build does not know about.
 
 ### 4.3 Result tables (CSV)
 | File | Columns (planned) |
@@ -245,7 +290,7 @@ Stable ordered columns: `distance_m`, `log_distance`, `heading_diff_deg`, `speed
 | `results/eda_summary.csv` | `partition, trip_id, n_points, n_nodes, n_arcs, n_route_arcs, duration_s, median_dt_s, max_gap_s, nonunit_dt_frac, bbox_*, route_len_m, track_len_m, route_track_ratio, route_gps_within50_frac, route_discontinuities, repeated_route_arcs, candidate_miss_rate, alignment_coverage` |
 | `results/model_comparison.csv` | `model, family, config, fold, top1_accuracy, macro_f1, precision, recall, log_loss, candidate_miss_rate, route_continuity, alignment_coverage, train_time_s, inference_ms` |
 | `results/optuna_trials.csv` | `trial, state, params_json, cv_macro_f1, duration_s` |
-| `results/hmm_comparison.csv` | `trip_id, method, top1_accuracy, macro_f1, log_loss, route_continuity, route_precision, route_recall, rmf, alignment_coverage, inference_ms` |
+| `results/hmm_comparison.csv` | `trip_id, partition, method, point_accuracy, route_continuity, route_precision, route_recall, rmf, alignment_coverage, inference_ms, n_points, n_missing_points, n_predicted_arcs, n_unbridged_transitions` |
 | `results/e2e_summary.csv` | `trip_id, status, method, n_predicted_arcs, top1_accuracy, route_continuity, alignment_coverage, inference_ms` |
 
 ---
@@ -278,8 +323,9 @@ Base URL: `http://<laptop-1>:8000`. All responses are JSON. No endpoint exposes 
 | `predicted_arcs` | int[] | Final decoded/stiched arc sequence. |
 | `route_coords` | `[lon,lat][]` | Polyline for the map. |
 | `point_predictions` | `[{obs_index, arc_id, confidence}]` | Per-observation output. |
-| `metrics` | object | `top1_accuracy`, `macro_f1`, `log_loss`, `candidate_miss_rate`, `route_continuity`, `route_precision`, `route_recall`, `rmf`, `alignment_coverage`, `inference_ms`. |
-| `layers` | object | `gps_points` (effective perturbed/downsampled points used for inference), optional `candidate_points`; never reference geometry. |
+| `metrics` | object | `top1_accuracy`, `macro_f1`, `decoder_macro_f1`, `route_f1`, `log_loss`, `candidate_miss_rate`, `route_continuity`, `route_precision`, `route_recall`, `rmf`, `alignment_coverage`, `precision`, `recall`. |
+| `inference_ms` | number | Top-level server-side pipeline latency (not inside `metrics`). |
+| `layers` | object | `gps_points` (effective perturbed/downsampled points used for inference) and the required `candidate_points` list; never reference geometry. |
 
 ### Error contracts
 - `404` trip not found.
@@ -339,7 +385,7 @@ Base URL: `http://<laptop-1>:8000`. All responses are JSON. No endpoint exposes 
 - 2026-11-18 — Steps 28–29: added `pathsnap/folium_maps.py` (`build_prediction_map`, `build_static_preview`, `predict_for_map`) and `scripts/07_folium.py` (selects best-gain/regression/first trips from `hmm_comparison.csv`, avoiding hardcoded IDs). Added `api/e2e.py` (`run_end_to_end`, `E2E_COLUMNS`) and `scripts/06_e2e.py`; `results/e2e_summary.csv` shows 10/10 HTTP 200, finite metrics, max inference 6.50 s. Maps write to `results/folium/` and previews to `results/figures/`.
 - 2026-11-18 — Steps 25–27: added the build-free UI (`ui/index.html`, `style.css`, `app.js`, `config.js`): trip list, health badge, Leaflet map with GPS/candidate/predicted-route layers, legend, metrics panel, method selector, debounced noise/sampling sliders, and stale-response protection. Added `docs/deployment.md` for single-machine and two-laptop LAN operation (CORS, `EVAL_DATA_DIR`, `apiBaseUrl`). UI tests are static/Node-syntax smoke tests.
 - 2026-11-18 — Steps 22–24: added `pathsnap/pipeline.py` (`PredictionResult`, `effective_track`, `route_coordinates`, `predict_trip`) and the API package: `api/schemas.py` (typed request/response, no reference fields), `api/service.py` (`PredictionService` artifact/trip loading, contract validation, metrics), `api/deps.py` (CORS/log env), `api/main.py` (lifespan, routes, request logging, error handling). Evaluation integrity: reference routes are used only inside `predict_trip` scoring; responses contain `predicted_arcs`, `route_coords`, `point_predictions`, `metrics`, and display `layers`.
-- 2026-11-18 — Steps 20–21: added decoder evaluation to `pathsnap/evaluate.py` (`TripInference`, `prepare_trip_inference`, `evaluate_decoders`, `tune_decoder_betas`, `write_decoder_failure_analysis`), decoder plots to `pathsnap/viz.py`, and `scripts/05_hmm.py`. `NetworkDistance` now caches one Dijkstra per source node (worst trip 44 s → 5.9 s). Outputs: `results/decoder_tuning.csv`, `hmm_comparison.csv`, `hmm_failure_analysis.md`, `best_decoder_params.json`, two figures; tuned β=50 persisted to `artifacts/hmm.json` and `config.json`.
+- 2026-11-18 — Steps 20–21: added decoder evaluation to `pathsnap/evaluate.py` (`TripInference`, `prepare_trip_inference`, `evaluate_decoders`, `tune_decoder_betas`, `write_decoder_failure_analysis`), decoder plots to `pathsnap/viz.py`, and `scripts/05_hmm.py`. `NetworkDistance` now caches one Dijkstra per source node (worst trip 44 s → 5.9 s). Outputs: `results/decoder_tuning.csv`, `hmm_comparison.csv`, `hmm_failure_analysis.md`, `best_decoder_params.json`, two figures; beta=50 persisted to `artifacts/hmm.json` and `config.json` at the time; the promoted artifacts were later switched to beta=2 with point refinement by `scripts/10_optimize_decoder.py`, and beta=50 survives only in `results/best_decoder_params.json`.
 - 2026-11-18 — Extra: added `pathsnap/eda_viz.py` (+ `scripts/01_eda_plots.py`) for six static EDA figures from `results/eda_summary.csv`, and `pathsnap/ablation.py` (+ `scripts/08_feature_ablation.py`) for full/leave-one-out/cumulative feature ablation on training folds. `fit_model` accepts a `feature_names` subset and `viz.py` gains `plot_feature_ablation`. Outputs: `results/feature_ablation.csv`, `feature_selection.md`, `selected_features.json`, `figures/feature_ablation.png`, `figures/eda_*.png`.
 - 2026-11-18 — Steps 18–19: added `pathsnap/hmm.py` (`HMMConfig`, `DecodeResult`, `NetworkDistance`, `normalize_log_scores`, `gaussian_log_emissions`, `classifier_log_emissions`, `transition_log_probability`, `transition_log_matrix`, `viterbi_log`, `decode_hmm`, `decode_nearest`, `decode_classifier`, `stitch_arc_sequence`). Emissions are normalised per observation; transitions use directed shortest-path distance with a cutoff and explicit invalid penalty; decoding splits at missing candidates/`gap_split_s`, runs log-space Viterbi per segment, and stitches with shortest paths. Added `HMM_GAUSSIAN_SIGMA_M` and `HMM_MAX_PATH_M` config defaults.
 - 2026-11-18 — Steps 16–17: added `pathsnap/tune.py` (`suggest_params`, `run_optimisation`, `compare_tuned_vs_untuned`, `fit_final_model`) and `pathsnap/artifacts.py` (`ModelArtifact`, `build_model_artifact`, `save_model_artifact` with joblib compression, `load_model_artifact`, `write_config_json`, `write_json`, `read_json`). `scripts/04_tune.py` writes `optuna_trials.csv`, `best_params.json`, `tuned_vs_untuned.csv`, and exports `artifacts/model.joblib` (15 MB), `config.json`, `hmm.json`. Search space is deliberately size-bounded (depth 8–14, leaves 10–30, trees 100–200); final fit uses the deterministic 300-observations/trip sample. `fit_model` now accepts estimator `params` overrides and records the effective spec.
@@ -358,3 +404,4 @@ Base URL: `http://<laptop-1>:8000`. All responses are JSON. No endpoint exposes 
 - 2026-11-18 — Step 02: added `pathsnap/config.py` as the single source for paths (`Paths`, `get_paths`, `ensure_output_directories`), seeds, candidate/alignment/HMM defaults, and env overrides. `pytest.ini` defines the `slow` marker and `tests/` testpath.
 - 2026-11-18 — Step 01 scaffolding: created `pathsnap/`, `api/`, `scripts/`, `ui/`, `tests/`, `artifacts/`, `results/{figures,folium}/`, `report/assets/`; added `requirements.txt`, `.gitignore` (excludes `data/` and local tool state), and placeholder `README.md`. Python 3.14.8 with FastAPI/Starlette, Pydantic v2, Optuna, and Folium installed.
 - 2026-11-18 — Data audit against `data/` and `docs/problem/`: 80 train + 10 test trips, disjoint IDs, all four files present, all route/node bounds valid, all timestamps finite and strictly increasing. Found 11/90 routes with 1–3 node discontinuities, 10/90 with repeated arcs (up to 255 repeats), and 2/80 training trips with severe GPS–route mismatch (`00000033`, `00000054`); all 10 student-test trips have ≥99% of points within 50 m of the reference route. Updated label alignment, EDA columns, metrics, and API contracts to report alignment coverage and tolerate anomalous references.
+- 2026-11-20 — Refinement pass: `pathsnap/hmm.py` selects parallel arcs by projected metres, validates candidate indices and probability shapes, and builds the connector lookup once per trip; `pathsnap/labels.py` adds `candidate_labels`/`align_to_inferred_route` and rejects out-of-range positions. `pathsnap/artifacts.py` adds `load_hmm_config` and shares `positive_class_probability` with `models.py`. `pathsnap/metrics.py` adds `route_f1`; `config.py` adds `CANDIDATE_THRESHOLD`, `HMM_BETA_GRID`, `MAX_CANDIDATE_LAYER_POINTS`, `TRAIN_MAX_OBSERVATIONS_PER_TRIP`, plus `cors_origins()`/`log_level()`. `pathsnap/pipeline.py` adds `prediction_summary`, `write_prediction_outputs`, `predict_directory`. New `pathsnap/decoder_tuning.py` and `pathsnap/report/` (blocks, content, markdown, pdf, latex) absorb script logic; `scripts/09_report.py` is now a ~60-line orchestrator with `--out-dir`.

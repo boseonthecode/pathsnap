@@ -9,8 +9,10 @@ FastAPI backend plus a build-free Leaflet UI.
 
 - **Data pipeline** — validated per-trip loaders, monotonic route-position label
   alignment, STRtree candidate generation, and deterministic feature caching.
-- **Five model families** — Logistic Regression, distance-weighted KNN,
-  ExtraTrees, LightGBM, and a shallow MLP, compared with trip-grouped CV.
+- **Eleven model families** — Logistic Regression, SGD logistic, distance-
+  weighted KNN, Gaussian Naive Bayes, ExtraTrees, Random Forest, Decision Tree,
+  LightGBM, HistGradientBoosting, AdaBoost, and a shallow MLP, compared with
+  trip-grouped CV.
 - **Feature ablation** — leave-one-feature-out and cumulative-group experiments.
 - **Bayesian tuning** — Optuna TPE search with recorded trials and a
   tuned-vs-untuned comparison.
@@ -26,15 +28,21 @@ FastAPI backend plus a build-free Leaflet UI.
 ## Repository layout
 
 ```
-pathsnap/     reusable data, ML, geometry, matching, and artifact logic
+pathsnap/     reusable data, ML, geometry, matching, artifact and report logic
 scripts/      thin numbered experiment entry points
 api/          FastAPI app, schemas, service layer, e2e helper
 ui/           plain HTML/CSS/JS + Leaflet (no build step)
+report/       report.md / report.pdf, report_latex.tex / .pdf, assets
 artifacts/    model.joblib, config.json, hmm.json
-results/      CSV tables, figures, Folium maps, analysis notes
+results/      CSV/JSON tables, figures, Folium maps, analysis notes,
+              plus model_metrics/, evaluator_test/, evaluator/,
+              decoder_optimization/, live_demo/ and ui/ subdirectories
 tests/        pytest suite
 docs/         problem briefs and deployment guide
 memory-bank/  PRD, architecture, implementation plan, progress
+CLAUDE.md     repository conventions for contributors and agents
+pytest.ini    test configuration and the `slow` marker
+start_ui.ps1  Windows launcher for the API + bundled UI
 ```
 
 ## Data layout
@@ -68,15 +76,22 @@ pip install -r requirements.txt
 python scripts/01_eda.py            # inventory, quality report, Folium EDA map
 python scripts/01_eda_plots.py      # static EDA figures
 python scripts/02_features.py       # build/refresh versioned feature caches
-python scripts/03_train.py          # five-model CV comparison + plots
+python scripts/03_train.py          # 11-model CV comparison + plots
 python scripts/04_tune.py           # Optuna tuning + artifacts/model.joblib
 python scripts/05_hmm.py            # nearest vs classifier vs classifier+HMM
-python scripts/08_feature_ablation.py  # feature selection/ablation
+python scripts/06_e2e.py            # HTTP checks for every evaluation trip
 python scripts/07_folium.py         # prediction maps + static previews
+python scripts/08_feature_ablation.py  # feature selection/ablation
+python scripts/09_report.py         # technical report (Markdown/PDF/LaTeX)
+python scripts/10_optimize_decoder.py  # decoder grid search + artifact export
+python scripts/11_evaluate_frozen.py   # frozen-artifact evaluator scoring
+python scripts/12_metrics_dashboard.py # model metrics for the UI dashboard
+python scripts/13_predict_cli.py    # live command-line inference demo
+python scripts/14_decoder_comparison.py # decoder comparison at deployed settings
 ```
 
 `scripts/03_train.py` takes a few minutes because it runs trip-grouped CV for
-five models. `scripts/04_tune.py` performs 15 Optuna trials and exports the
+eleven models. `scripts/04_tune.py` performs 15 Optuna trials and exports the
 final artifacts. All randomness uses seeds in `pathsnap/config.py`.
 
 ## API + UI
@@ -172,12 +187,23 @@ python scripts/06_e2e.py       # HTTP checks for every evaluation trip
 | :--- | :--- |
 | `results/eda_summary.csv` | One row per trip, including route anomalies and coverage |
 | `results/feature_ablation.csv` | Full / leave-one-out / cumulative feature ablation |
-| `results/model_comparison.csv` | Fold-level and aggregate CV metrics for five models |
+| `results/model_comparison.csv` | Fold-level and aggregate CV metrics for 11 models |
 | `results/student_test_comparison.csv` | Student-test metrics per model |
 | `results/optuna_trials.csv` | Bayesian optimisation trials |
 | `results/tuned_vs_untuned.csv` | Tuned vs untuned comparison |
 | `results/hmm_comparison.csv` | Nearest vs classifier vs classifier+HMM |
 | `results/e2e_summary.csv` | End-to-end API checks for all evaluation trips |
+| `results/best_params.json` | Winning Optuna trial for the classifier |
+| `results/best_decoder_params.json` | Baseline decoder settings (beta = 50) |
+| `results/decoder_tuning.csv` | Decoder beta grid search |
+| `results/eda_report.md` | Data-quality report |
+| `results/feature_selection.md` | Feature selection notes |
+| `results/model_selection.md` | Model comparison notes |
+| `results/hmm_failure_analysis.md` | Failure analysis for the decoder |
+| `results/selected_features.json` | Features kept for the final model |
+| `results/model_metrics/REPORT.md` | Deployed-model metrics dashboard |
+| `results/evaluator_test/REPORT.md` | Frozen-artifact evaluator report |
+| `report/report_latex.tex`, `.pdf` | LaTeX source and PDF build |
 
 Figures live in `results/figures/`; interactive maps live in `results/folium/`.
 
@@ -190,12 +216,17 @@ versions, and git commit. `artifacts/hmm.json` records the tuned decoder
 parameters (beta = 2 m, backward projection tolerance = 60 m, inferred-route
 point refinement enabled).
 
-To regenerate the original training pipeline (overwrites optimized artifacts):
+`scripts/04_tune.py` + `scripts/05_hmm.py` reproduce the **beta = 50 baseline**
+(the settings in `results/best_decoder_params.json`), not the committed
+artifacts. The promoted artifacts are produced by:
 
 ```bash
-python scripts/04_tune.py
-python scripts/05_hmm.py
+python scripts/10_optimize_decoder.py
+python scripts/11_evaluate_frozen.py
 ```
+
+Regenerate the report from the stored result tables with
+`python scripts/09_report.py` (add `--out-dir DIR` to write elsewhere).
 
 ### Optimized decoder and evaluator results
 
@@ -208,10 +239,18 @@ Decoder selection used a 64/16 split of the 80 training trips. Evaluator data
 was scored only after model/settings selection. See
 [`results/evaluator_test/REPORT.md`](results/evaluator_test/REPORT.md) for the
 full comparison, per-trip results, limitations, and reproduction commands.
-The original artifacts are preserved locally in `.cache/baseline_artifacts/`.
 
 To serve the evaluator archive after extracting it under `data/evaluator_test`,
 set `EVAL_DATA_DIR=data/evaluator_test` before starting the API.
+
+## AI assistance
+
+Team members used AI coding assistants for repository scaffolding, refactoring,
+test generation, and report drafting. All experiments, model training and
+tuning, decoder selection, and result verification were run by the team on the
+provided data; every reported number is produced by a script in `scripts/` and
+stored under `results/`. Team members can explain and defend each claim in the
+report.
 
 ## Evaluation integrity
 

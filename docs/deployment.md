@@ -14,11 +14,11 @@ Leaflet UI. No database, auth provider, or build step is required.
 pip install -r requirements.txt
 ```
 
-If artifacts are missing, regenerate them:
-
-```bash
-python scripts/04_tune.py
-```
+`artifacts/` ships with the repository. To rebuild the **baseline** artifacts
+(beta = 50), run `python scripts/04_tune.py` then `python scripts/05_hmm.py`.
+The committed, promoted artifacts are produced by
+`python scripts/10_optimize_decoder.py` followed by
+`python scripts/11_evaluate_frozen.py`.
 
 ## 2. Single-machine demo
 
@@ -34,8 +34,11 @@ Terminal 2 — UI:
 python -m http.server 5500 --directory ui
 ```
 
-Open `http://localhost:5500`. `ui/config.js` defaults to
-`http://localhost:8000`.
+Open `http://localhost:5500`. `ui/config.js` ships pointing at
+`http://localhost:8000`; change `apiBaseUrl` if the API runs elsewhere.
+
+On Windows, `./start_ui.ps1` launches both processes and serves the UI from the
+API itself at `http://127.0.0.1:8000/ui/`.
 
 ## 3. Two-laptop LAN demo
 
@@ -69,6 +72,8 @@ Open `http://<laptop-2-ip>:5500`.
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `EVAL_DATA_DIR` | `data/test` | Directory of trip folders served by the API |
+| `TRAIN_DATA_DIR` | `data/train` | Training trips used by the offline scripts |
+| `TEST_DATA_DIR` | `data/test` | Student-testing trips used by the offline scripts |
 | `ARTIFACT_DIR` | `artifacts` | Model/config/HMM artifacts |
 | `RESULTS_DIR` | `results` | Experiment outputs |
 | `CACHE_DIR` | `.cache/pathsnap` | Versioned feature caches |
