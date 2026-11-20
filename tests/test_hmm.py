@@ -200,3 +200,83 @@ def test_real_trip_hmm_route_is_contiguous_and_covers_observations() -> None:
     assert np.all(predicted >= 0) and np.all(predicted < trip.n_arcs)
     assert route_continuity(predicted, trip.arcs) >= 0.9
     assert np.mean(result.point_arc_ids >= 0) >= 0.95
+
+
+def test_normalize_log_scores_returns_log_probabilities() -> None:
+    from pathsnap.hmm import normalize_log_scores
+
+    normalized = normalize_log_scores(np.array([-1.0, -3.0, -2.0]))
+    assert np.isclose(np.exp(normalized).sum(), 1.0)
+    assert normalize_log_scores(np.array([])).size == 0
+
+
+def test_transition_log_matrix_shape_and_finite_scores(tmp_path: Path) -> None:
+    from pathsnap.hmm import transition_log_matrix
+
+    trip = _toy_trip(tmp_path)
+    groups = generate_candidates(trip).by_observation()
+    candidates = groups[next(iter(groups))]
+    matrix = transition_log_matrix(
+        candidates, candidates, 5.0, NetworkDistance(trip), HMMConfig()
+    )
+    assert matrix.shape == (len(candidates), len(candidates))
+    assert np.all(np.isfinite(matrix))
+
+
+def test_decode_nearest_and_classifier_cover_every_observation(tmp_path: Path) -> None:
+    from pathsnap.hmm import decode_classifier, decode_nearest
+
+    trip = _toy_trip(tmp_path)
+    candidates = generate_candidates(trip)
+    probabilities = np.full(len(candidates.candidates), 0.5)
+
+    nearest = decode_nearest(trip, candidates)
+    classifier = decode_classifier(trip, candidates, probabilities)
+
+    assert nearest.method == "nearest"
+    assert classifier.method == "classifier"
+    for result in (nearest, classifier):
+        assert result.point_arc_ids.shape == (trip.n_points,)
+        assert np.all(result.point_arc_ids >= 0)
+
+
+def test_decode_hmm_rejects_mismatched_probability_shape(tmp_path: Path) -> None:
+    trip = _toy_trip(tmp_path)
+    candidates = generate_candidates(trip)
+    with pytest.raises(ValueError, match="probabilities has shape"):
+        decode_hmm(trip, candidates, probabilities=np.zeros(1))
+
+
+def test_decode_classifier_rejects_mismatched_probability_shape(tmp_path: Path) -> None:
+    from pathsnap.hmm import decode_classifier
+
+    trip = _toy_trip(tmp_path)
+    candidates = generate_candidates(trip)
+    with pytest.raises(ValueError, match="probabilities has shape"):
+        decode_classifier(trip, candidates, np.zeros(1))
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"top_k": 0},
+        {"radius_m": 0.0},
+        {"emission": "magic"},
+        {"beta_m": 0.0},
+        {"distance_weight": -1.0},
+    ],
+)
+def test_hmm_config_rejects_invalid_settings(settings: dict) -> None:
+    with pytest.raises(ValueError):
+        HMMConfig(**settings)
+
+
+def test_node_arc_lookup_maps_each_pair_to_a_connecting_arc(tmp_path: Path) -> None:
+    from pathsnap.hmm import _node_arc_lookup
+
+    trip = _toy_trip(tmp_path)
+    lookup = _node_arc_lookup(trip)
+    assert lookup, "expected at least one connector"
+    for (from_node, to_node), arc_id in lookup.items():
+        assert int(trip.arcs[arc_id, 0]) == from_node
+        assert int(trip.arcs[arc_id, 1]) == to_node

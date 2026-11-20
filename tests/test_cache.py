@@ -84,3 +84,18 @@ def test_corrupt_cache_is_rebuilt(tiny_trip_dir: Path, tmp_path: Path) -> None:
 
     assert rebuilt.from_cache is False
     assert rebuilt.features.n_rows > 0
+
+
+def test_truncated_cache_archive_is_a_miss(tiny_trip_dir: Path, tmp_path: Path) -> None:
+    from pathsnap.cache import compute_cache_version
+
+    trip = load_trip(tiny_trip_dir)
+    cache_dir = tmp_path / "cache"
+    version = compute_cache_version()
+    cached = load_or_build_trip_artifacts(trip, cache_dir=cache_dir, version=version)
+    assert cached.from_cache is False
+
+    archive = cache_dir / version / f"{trip.trip_id}.npz"
+    archive.write_bytes(archive.read_bytes()[:64])
+
+    assert load_trip_artifacts(trip.trip_id, cache_dir, version) is None

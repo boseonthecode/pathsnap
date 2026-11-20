@@ -102,3 +102,38 @@ def test_known_anomalous_training_trips_are_flagged_low_coverage() -> None:
 
         assert result.low_coverage, trip_id
         assert result.coverage < 0.5, trip_id
+
+
+def test_candidate_labels_flags_matching_arcs() -> None:
+    from pathsnap.labels import AlignmentResult, candidate_labels
+
+    alignment = AlignmentResult(
+        trip_id="t",
+        positions=np.array([0, 1, -1], dtype=np.int32),
+        arc_ids=np.array([4, 5, -1], dtype=np.int32),
+        distances_m=np.zeros(3),
+        alignable=np.array([True, True, False]),
+        coverage=2 / 3,
+        backward_steps=0,
+        low_coverage=True,
+    )
+    labels = candidate_labels(alignment, np.array([0, 1, 2]), np.array([4, 9, 7]))
+    assert labels.tolist() == [1, 0, 0]
+    assert labels.dtype == np.int8
+
+
+def test_candidate_labels_rejects_out_of_range_observations() -> None:
+    from pathsnap.labels import AlignmentResult, candidate_labels
+
+    alignment = AlignmentResult(
+        trip_id="t",
+        positions=np.array([0], dtype=np.int32),
+        arc_ids=np.array([1], dtype=np.int32),
+        distances_m=np.zeros(1),
+        alignable=np.array([True]),
+        coverage=1.0,
+        backward_steps=0,
+        low_coverage=False,
+    )
+    with pytest.raises(ValueError, match="observation index"):
+        candidate_labels(alignment, np.array([5]), np.array([1]))

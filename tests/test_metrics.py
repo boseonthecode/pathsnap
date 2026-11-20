@@ -102,3 +102,12 @@ def test_timer_reports_positive_elapsed_time() -> None:
     with Timer() as timer:
         sum(range(1000))
     assert timer.elapsed_ms >= 0.0
+
+
+def test_route_f1_is_harmonic_mean_and_zero_safe() -> None:
+    from pathsnap.metrics import route_f1
+
+    assert route_f1(1.0, 1.0) == 1.0
+    assert route_f1(0.0, 0.0) == 0.0
+    assert np.isclose(route_f1(0.5, 1.0), 2 * 0.5 * 1.0 / 1.5)
+    assert route_f1(0.0, 1.0) == 0.0

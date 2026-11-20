@@ -113,3 +113,28 @@ print(json.dumps(artifact.positive_probability(features).tolist()))
         rtol=1e-12,
         atol=1e-12,
     )
+
+
+def test_load_hmm_config_drops_unknown_keys(tmp_path: Path) -> None:
+    from pathsnap.artifacts import load_hmm_config
+
+    payload = {"beta_m": 2.0, "refine_points": True, "unknown_future_key": 1}
+    path = write_json(tmp_path / "hmm.json", payload)
+    settings = load_hmm_config(path)
+    assert settings.beta_m == 2.0
+    assert settings.refine_points is True
+
+
+def test_load_hmm_config_falls_back_to_config_json(tmp_path: Path) -> None:
+    from pathsnap.artifacts import load_hmm_config
+
+    write_json(tmp_path / "config.json", {"hmm": {"beta_m": 7.5}})
+    settings = load_hmm_config(tmp_path / "missing.json", fallback=tmp_path / "config.json")
+    assert settings.beta_m == 7.5
+
+
+def test_load_hmm_config_uses_defaults_when_nothing_exists(tmp_path: Path) -> None:
+    from pathsnap.artifacts import load_hmm_config
+    from pathsnap.hmm import HMMConfig
+
+    assert load_hmm_config(tmp_path / "missing.json") == HMMConfig()

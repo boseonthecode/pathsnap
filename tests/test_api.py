@@ -189,3 +189,35 @@ def test_prediction_logs_contain_no_ground_truth(client: TestClient, caplog) -> 
 def test_missing_artifacts_raise_a_clear_startup_error(tmp_path: Path) -> None:
     with pytest.raises((FileNotFoundError, OSError)):
         PredictionService(tmp_path / "eval", tmp_path / "missing-artifacts")
+
+
+def test_prediction_service_rejects_feature_contract_mismatch(tmp_path: Path) -> None:
+    import json
+
+    eval_dir = tmp_path / "eval"
+    trip_dir = write_trip(eval_dir, "00000048")
+    training_trip = load_trip(trip_dir, "train")
+    training_dataset = build_trip_dataset(
+        training_trip, build_trip_artifacts(training_trip)
+    )
+    trained = fit_model(
+        "logistic_regression", training_dataset.features, training_dataset.labels
+    )
+    artifact = build_model_artifact(trained)
+
+    artifact_dir = tmp_path / "artifacts"
+    save_model_artifact(artifact, artifact_dir / "model.joblib")
+    config_path = write_config_json(
+        artifact_dir / "config.json",
+        artifact,
+        candidate_config={"top_k": 8},
+        alignment_config={"max_distance_m": 50.0},
+        hmm_config=HMMConfig().to_dict(),
+        seed=42,
+    )
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["feature_names"] = list(reversed(payload["feature_names"]))
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="feature order"):
+        PredictionService(eval_dir, artifact_dir)

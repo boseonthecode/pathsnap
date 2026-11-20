@@ -103,3 +103,20 @@ def test_final_model_trains_on_all_training_trips(tmp_path: Path) -> None:
     assert trained.spec.name == "extra_trees"
     assert trained.spec.params["n_estimators"] == 100
     assert trained.train_time_s >= 0.0
+
+
+def test_suggest_params_stays_inside_the_configured_ranges() -> None:
+    import optuna
+
+    from pathsnap.tune import suggest_params
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    trial = optuna.create_study(direction="maximize").ask()
+    params = suggest_params(trial)
+
+    assert 100 <= params["n_estimators"] <= 200
+    assert 8 <= params["max_depth"] <= 14
+    assert 10 <= params["min_samples_leaf"] <= 30
+    assert params["max_features"] in {"sqrt", "log2", 0.5}
+    assert params["criterion"] in {"gini", "entropy"}
+    assert params["class_weight"] in {"balanced_subsample", "balanced"}

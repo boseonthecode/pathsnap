@@ -157,3 +157,41 @@ def test_arc_lengths_are_metric_and_ordered(tiny_trip_dir: Path) -> None:
     assert lengths.shape == (4,)
     assert np.all(lengths > 0)
     assert lengths[0] == pytest.approx(lengths[1], rel=0.01)
+
+
+def test_polyline_length_m_sums_segments() -> None:
+    from pathsnap.geometry import polyline_length_m
+
+    points = np.array([[0.0, 0.0], [3.0, 0.0], [3.0, 4.0]])
+    assert polyline_length_m(points) == pytest.approx(7.0)
+    assert polyline_length_m(np.array([[1.0, 1.0]])) == 0.0
+
+
+def test_build_directed_graph_weights_are_metres() -> None:
+    from pathsnap.geometry import build_directed_graph
+
+    trip = load_trip(write_trip(Path("/tmp") / "geo_trip", "00000061"))
+    graph = build_directed_graph(trip)
+    assert graph.number_of_nodes() == trip.n_nodes
+    # 0.001 degrees of latitude is about 111 m, and must not be ~0.001.
+    assert graph[0][1]["length_m"] == pytest.approx(111.0, rel=0.35)
+    assert graph.has_edge(0, 1) and graph.has_edge(1, 2)
+
+
+def test_utm_crs_for_bbox_uses_the_centroid_zone() -> None:
+    from pathsnap.geometry import utm_crs_for_bbox
+
+    assert utm_crs_for_bbox(np.array([-0.01, -0.01, 0.01, 0.01])).to_epsg() == 32631
+    assert utm_crs_for_bbox(np.array([179.0, 10.0, 179.9, 10.2])).to_epsg() == 32660
+    assert utm_crs_for_bbox(np.array([-179.9, -30.0, -179.0, -29.8])).to_epsg() == 32701
+
+
+def test_point_to_segment_distance_matrix_shape_and_zero_on_segment() -> None:
+    from pathsnap.geometry import point_to_segment_distance_matrix
+
+    points = np.array([[0.0, 5.0], [10.0, 5.0]])
+    starts = np.array([[0.0, 0.0]])
+    ends = np.array([[10.0, 0.0]])
+    matrix = point_to_segment_distance_matrix(points, starts, ends)
+    assert matrix.shape == (2, 1)
+    assert np.allclose(matrix, 5.0)
